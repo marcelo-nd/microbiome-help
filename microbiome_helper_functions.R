@@ -1,4 +1,68 @@
+extract_tax_gg_from_biom <- function(table, level = "Species"){
+  tax_list <- c()
+  if (level == "Species") {
+    for (row in 1:nrow(table)) {
+      genus = table$Genus[row]
+      species = table$Species[row]
+      tax = paste(genus, species, sep = "_")
+      tax_list <- c(tax_list, c(tax))
+    }
+  }
+  return(tax_list)
+}
+
 ###################################################################################################
+
+dereplicate_taxonomy <- function(tax_vector){
+  if (!"collections" %in% installed.packages()) install.packages("collections")
+  
+  species_list <- c() # list to store final names of OTUs
+  species_counts <- collections::dict() # dictionary to help store names of OTUs and their counts
+  
+  # for each "species" row in taxonomy column
+  for(species in tax_vector){
+    # if species is already in dictionary, has already been found before
+    if(species_counts$has(species)){
+      # set the species count +1 and add the species including it's count to the species list.
+      species_counts$set(species, species_counts$get(species) + 1)
+      species_list <- c(species_list, c( paste(species, species_counts$get(species), sep = "_")))
+    }else{
+      # if species has not been found before, add species to dictionary, and add species to list.
+      species_counts$set(species, 1)
+      species_list <- c(species_list, c( paste(species, "1", sep = "_") ))
+    }
+  }
+  return(species_list)
+}
+
+###################################################################################################
+
+get_otu_table_dada <- function(biom_file, starting_col, level = "Species"){
+  if(!requireNamespace("BiocManager")){
+    install.packages("BiocManager")
+  }
+  
+  if(!requireNamespace("phyloseq")){
+    BiocManager::install("phyloseq")
+  }
+  
+  library(phyloseq)
+
+  if(!requireNamespace("metagMisc")){
+    devtools::install_github("vmikk/metagMisc")
+  }
+  
+  biom_otu_tax <- phyloseq::import_biom(biom_file, parseFunction = phyloseq::parse_taxonomy_greengenes)
+  #rank_names(biom_otu_tax)
+  tax_sp <- phyloseq::tax_glom(biom_otu_tax, taxrank="Species")
+  tax_sp_df <- metagMisc::phyloseq_to_df(tax_sp, addtax = T, addtot = F, addmaxrank = T, sorting = "abundance")
+  tax_sp_df["taxonomy"] <- dereplicate_taxonomy(extract_tax_gg_from_biom(table = tax_sp_df))
+  out_df <- tax_sp_df[1:nrow(tax_sp_df), starting_col:(ncol(tax_sp_df)-1)]
+  #print(tax_sp_df$taxonomy)
+  rownames(out_df) <- tax_sp_df$taxonomy
+  return(out_df)
+}
+
 ###################################################################################################
 # Function that parses a string on greengenes format and outputs a string in readable format.
 # Input: string: "k__Bacteria; p__Firmicutes; c__Clostridia; o__Clostridiales; f__Clostridiaceae; g__Clostridium; s__acetobutylicum"
