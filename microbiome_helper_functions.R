@@ -196,7 +196,7 @@ get_replicate_means <- function(replicate_data, id_col_name = NULL, id = NULL, r
   if (standard) {
     std_means <- c()
     for(row in 1:nrow(replicate_data)){
-      # Initiliazing sum and actual summed count
+      # Initializing sum and actual summed count
       temp_sum = 0
       rep_count = 0
       # For loop iterating the number of subreplicates
@@ -278,14 +278,48 @@ get_qnty_from__std <- function(raw_qnts, id_col = NULL, replicates, std_values){
     temp_col <- c()
     # for all compound rows in DF
     for(row in 1:nrow(raw_qnts)){
-      # append value for each calculated compund.
-      # Calculation is a rule of three betwen compound equivalencies,  standard values. SUBSETTING.
+      # append value for each calculated compound.
+      # Calculation is a rule of three between compound equivalencies,  standard values. SUBSETTING.
       temp_col <- c(temp_col, c(std_values[[row, 2]] * raw_qnts[[row, col]] / raw_qnts[[row, 3]]))
     }
     # Adding temporary column to cnvt_qnts DF
     convtd_qnts[colnames(raw_qnts[col])] <- temp_col
   }
   return(convtd_qnts)
+}
+
+###################################################################################################
+
+#' Stability per period
+#'
+#'Calculates stability of functional parameter per period.
+#'
+#' @param replicate_data 
+#' @param period 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+stability_per_period <- function(replicate_data, period) {
+  
+  # results dataframe
+  results_df <- data.frame(row.names = colnames(replicate_data_biogas))
+  for (day in seq(from = period, to = nrow(replicate_data), by= 1)) {
+    temp_col <- c()
+    starting_day <- day-period+1
+    #print(starting_day)
+    end_day <- day
+    #print(end_day)
+    temp_data <- replicate_data[starting_day:end_day, ]
+    #print(temp_data)
+    means <- sapply(temp_data, mean)
+    std_dev <- sapply(temp_data, sd)
+    period_stability <- 1 -(std_dev/means)
+    print(period_stability)
+    results_df[paste("day ", day)] <- period_stability
+  }
+  return(results_df)
 }
 
 ###################################################################################################
