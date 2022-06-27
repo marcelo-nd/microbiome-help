@@ -292,32 +292,45 @@ get_qnty_from__std <- function(raw_qnts, id_col = NULL, replicates, std_values){
 
 #' Stability per period
 #'
-#'Calculates stability of functional parameter per period.
+#' Calculates the mean stability index mean of a functional parameter of replicate data for a period of time.
 #'
 #' @param replicate_data 
-#' @param period 
+#' @param period_length
+#' @param time_unit
 #'
-#' @return
+#' @return Dataframe where rows are replicates and columns are "time_unit"(s) (days, etc). Each entry corresponds to the stability index of the period including the current time and previous "period_length" time units.
 #' @export
 #'
 #' @examples
-stability_per_period <- function(replicate_data, period) {
+stability_per_period <- function(replicate_data, period_length, time_unit = "day") {
   
-  # results dataframe
+  # Creating empty dataframe where stability measures for each replicate will be stored.
+  # Rows are replicates.
+  # Columns are "time_unit"(s) (days, etc).
+  # Each entry corresponds to the stability index of the period including the current time and previous "period_length" time units.
   results_df <- data.frame(row.names = colnames(replicate_data_biogas))
-  for (day in seq(from = period, to = nrow(replicate_data), by= 1)) {
+  # Iterating over each time in which functional parameter was measured.
+  for (day in seq(from = period_length, to = nrow(replicate_data), by= 1)) {
+    # Empty vector that becomes the column containing stability indices for each replicate for the current time.
     temp_col <- c()
-    starting_day <- day-period+1
+    # starting day is the first day included in stability calculation
+    starting_day <- day-period_length+1
     #print(starting_day)
+    # starting day is the last day included in stability calculation
     end_day <- day
     #print(end_day)
+    # Subsetting the data included in the stability indices calculation.
     temp_data <- replicate_data[starting_day:end_day, ]
     #print(temp_data)
+    # Mean of the functional parameter for each replicate for the current period.
     means <- sapply(temp_data, mean)
+    # standard deviation of the functional parameter for each replicate for the current period.
     std_dev <- sapply(temp_data, sd)
+    # Stability indices of the functional parameter for each replicate for the current period.
     period_stability <- 1 -(std_dev/means)
-    print(period_stability)
-    results_df[paste("day ", day)] <- period_stability
+    #print(period_stability)
+    # append the stability data for current period
+    results_df[paste(paste(time_unit, " "), day)] <- period_stability
   }
   return(results_df)
 }
