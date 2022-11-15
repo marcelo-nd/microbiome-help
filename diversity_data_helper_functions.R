@@ -100,7 +100,7 @@ greengenes_parser_sp_level <- function(string){
 
 ###################################################################################################
 
-read_qiime_otu_table <- function(table_path){
+read_qiime_otu_table <- function(table_path, level = "Species"){
   if (!"readr" %in% installed.packages()) install.packages("readr")
   if (!"collections" %in% installed.packages()) install.packages("collections")
   if (!"dplyr" %in% installed.packages()) install.packages("dplyr")
@@ -110,7 +110,13 @@ read_qiime_otu_table <- function(table_path){
   otu_table <- readr::read_delim(table_path, skip = 1 ,delim = "\t")
 
   # getting a vector of parsed taxonomy
-  tax_col <- apply(otu_table["taxonomy"], 1, greengenes_parser_sp_level)
+  if (level == "Species") {
+    tax_col <- apply(otu_table["taxonomy"], 1, greengenes_parser_sp_level)
+  }
+  else if (level == "Strain") {
+    tax_col <- apply(otu_table["taxonomy"], 1, greengenes_parser_strain_level)
+  }
+  
     
   # renaming species in taxonomy.
   # To avoid duplicates, if OTUs with the same names are found more than once "sp + number" is added to name.
