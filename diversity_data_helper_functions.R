@@ -13,31 +13,6 @@ extract_tax_gg_from_biom <- function(table, level = "Species"){
 
 ###################################################################################################
 
-dereplicate_taxonomy <- function(tax_vector){
-  if (!"collections" %in% installed.packages()) install.packages("collections")
-  
-  species_list <- c() # list to store final names of OTUs
-  species_counts <- collections::dict() # dictionary to help store names of OTUs and their counts
-  
-  # for each "species" row in taxonomy column
-  for(species in tax_vector){
-    # if species is already in dictionary, has already been found before
-    if(species_counts$has(species)){
-      # set the species count +1 and add the species including it's count to the species list.
-      species_counts$set(species, species_counts$get(species) + 1)
-      species_list <- c(species_list, c( paste(species, species_counts$get(species), sep = "_")))
-    }else{
-      # if species has not been found before, add species to dictionary, and add species to list.
-      species_counts$set(species, 1)
-      species_list <- c(species_list, c( paste(species, "1", sep = "_") ))
-    }
-  }
-  return(species_list)
-}
-
-
-###################################################################################################
-
 AlmostEqual <- function(x, y, tolerance=1e-8) {
   diff <- abs(x - y)
   mag <- pmax(abs(x), abs(y))

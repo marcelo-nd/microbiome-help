@@ -1,57 +1,138 @@
+###################################################################################################
+##### Install packages
+if (!"collections" %in% installed.packages()) install.packages("collections")
+if (!"dplyr" %in% installed.packages()) install.packages("dplyr")
+if (!"tidyr" %in% installed.packages()) install.packages("tidyr")
+if (!"tibble" %in% installed.packages()) install.packages("tibble")
+if (!require("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+if (!"phyloseq" %in% installed.packages()) BiocManager::install("phyloseq", update = FALSE)
+
+###################################################################################################
+
+# This function takes a character vector containing the result of splitting a taxonomy vector.
+# It returns a named vector where each field is a taxonomic rank for the passed taxonomy entry.
+# The taxonomic ranks are the same as in the greengenes taxonomy format but include a "Strain" rank.
+# This function is used by phyloseq's "import_biom" function to parse taxonomy
+# import_biom splits taxonomy vectors atuomatically when in greengenes' format.
 parse_taxonomy_strain <- function(char.vec){
+  # Remove the greengenes taxonomy rank id prefix.
   named.char.vec <- substring(char.vec, first = 4)
+  # Set the names for each rank.
   names(named.char.vec) = c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species", "Strain")
   return(named.char.vec)
 }
 
-load_biom <- function(path, tax_rank = "Species", dereplicate = FALSE){
-  biom <- phyloseq::import_biom(biom_path, parseFunction=parse_taxonomy_strain)
-  biom <- phyloseq::tax_glom(biom, taxrank = tax_rank, NArm=TRUE)
-  # cbind tax_table and otu_table
-  if (tax_rank == "Strain") {
-    feature_table <- cbind(dplyr::select(tidyr::unite(data.frame(tax_table(biom)),
-                                                      taxonomy,
-                                                      c("Genus", "Species", "Strain"),
-                                                      sep = "_"), "taxonomy"),
-                           data.frame(otu_table(biom)))
-  }else if (tax_rank == "Species") {
-    feature_table <- cbind(dplyr::select(tidyr::unite(data.frame(tax_table(biom)),
-                                                      taxonomy,
-                                                      c("Genus", "Species"),
-                                                      sep = "_"), "taxonomy"),
-                           data.frame(otu_table(biom)))
-  }else if (tax_rank == "Family" || tax_rank == "Order"){
-    feature_table <- cbind(dplyr::select(tidyr::unite(data.frame(tax_table(biom)),
-                                                      taxonomy,
-                                                      tax_rank,
-                                                      sep = "_"), "taxonomy"),
-                           data.frame(otu_table(biom)))
-  }
+###################################################################################################
+# This function takes a vector of strings. Each string is the taxonomic id for a feature (OTU/ASV) in an ASV/OTU table.
+# Dereplication in this context means to make every string in the vector unique.
+# Strings (taxonomic ids) with repeated occurrences are enumerated (a sequential number n is added to the end of the string).
+# The function requires the "collections" package to store and count the string entries.
+dereplicate_taxonomy <- function(tax_vector, first_numerated = FALSE){
   
-  # Dereplicate taxonomy
-  return(tibble::column_to_rownames(tibble::remove_rownames(feature_table), var = "taxonomy"))
+  features_taxonomy_list_dereplicated <- c() # list to store final names of bacterial features
+  features_counts <- collections::dict() # dictionary to help store names of bacterial features and their counts.
+  
+  # for each feature in the taxonomy column
+  for(taxonomic_id in tax_vector){
+    # if feature's taxonomic id is already in the dictionary (it has already been encountered before).
+    if(features_counts$has(taxonomic_id)){
+      # set the feature's count +1 in the "features_counts" dictionary.
+      features_counts$set(taxonomic_id, features_counts$get(taxonomic_id) + 1)
+      # Add the taxonomic id with it's respective count to the features_taxonomy_list_dereplicated.
+      features_taxonomy_list_dereplicated <- c(features_taxonomy_list_dereplicated, c( paste(taxonomic_id, features_counts$get(taxonomic_id), sep = "_")))
+    }else{
+      # if species has not been found before, add species to dictionary.
+      features_counts$set(taxonomic_id, 1)
+      # Add species to features_taxonomy_list_dereplicated.
+      if (first_numerated == TRUE) {
+        features_taxonomy_list_dereplicated <- c(features_taxonomy_list_dereplicated, c( paste(taxonomic_id, "1", sep = "_") ))
+      }else{
+        features_taxonomy_list_dereplicated <- c(features_taxonomy_list_dereplicated, c(taxonomic_id))
+      }
+    }
+  }
+  return(features_taxonomy_list_dereplicated)
 }
 
+# This function takes a "biom_path" to a biom file with an otu_table and a tax_table, a string "tax_rank",
+# and bool "order_table".
+# tax_rank parameter must be a value of greengenes ranks format.
+# "order_table" indicates if the table should be ordered by larger to smaller values of rowMeans.
+# Generally, ASV/OTU tables from QIIME2 are already ordered.
+# The ASVs in the biom file are agglomerated by this rank.
+# This function returns a dataframe where rows are the ASVs and the columns are samples.
+# "rownames" are ASVs taxonomy at the selected rank. "colnames" are samples names.
+# Taxonomy is dereplicated so that no row has the same name (which is not allowed).
+# The output format is useful for using in other packages like vegan an to generate plots like barplots and heatmaps.
 
-tax_table_test <- data.frame(tax_table(tax_test))
+load_biom <- function(biom_path, tax_rank = "Species", order_table = FALSE){
+  unite_colNames = get_colNames_per_rank(tax_rank)
+  
+  if (!is.null(unite_colNames)) {
+    biom_object <- phyloseq::import_biom(biom_path, parseFunction=parse_taxonomy_strain)
+    extracted_feature_table <- extract_table(biom_object, tax_rank)
+  }else{
+    print("Please choose a valid taxonomy rank!")
+    return()
+  }
+  
+  return(clean_table(extracted_feature_table, order_table = order_table))
+  }
 
-tax_table_test
+extract_table <- function(biom_object, tax_rank){
+  unite_colNames = get_colNames_per_rank(tax_rank)
+  # Agglomerate tax_table by the chosen tax_rank
+  biom_object <- phyloseq::tax_glom(biom_object, taxrank = tax_rank, NArm=TRUE)
+  # cbind tax_table and otu_table
+  feature_table <- cbind(dplyr::select(tidyr::unite(data.frame(phyloseq::tax_table(biom_object)),
+                                                    taxonomy,
+                                                    all_of(unite_colNames),
+                                                    sep = "_"), "taxonomy"),
+                         data.frame(phyloseq::otu_table(biom_object)))
+}
 
-test_str <- strsplit("k__Bacteria; p__Actinobacteria; c__Actinomycetia; o__Propionibacteriales; f__Propionibacteriaceae; g__Cutibacterium; s__acnes; n__ NR_113028.1", split  = "; ")[[1]]
-test_str
+get_colNames_per_rank <- function(tax_rank){
+  colNames = NULL
+  switch(tax_rank,
+         Strain = {
+           colNames = c("Genus", "Species", "Strain")
+         },
+         Species = {
+           # Species level
+           colNames = c("Genus", "Species")
+         },
+         Genus = {
+           # Genus level
+           colNames = c("Genus")
+         },
+         Family = {
+           # Family
+           colNames = c("Family")
+         },
+         Family = {
+           # Order
+           colNames = c("Order")}
+  )
+  if (!is.null(colNames)){
+    return(colNames)
+  }else{
+    return(NULL)
+  }
+}
 
-parse_taxonomy_strain(test_str)
-
-typeof(parse_taxonomy_default(test_str))
-
-tax_table(test_biom)
-
-
-
-
-
-
-
+clean_table <- function(feature_table, order_table){
+  # Dereplicate taxonomy
+  feature_table["taxonomy"] <- dereplicate_taxonomy(feature_table$taxonomy, first_numerated = FALSE)
+  # Set taxonomy column as rownames
+  feature_table <- tibble::column_to_rownames(tibble::remove_rownames(feature_table), var = "taxonomy")
+  
+  if (order_table) {
+    # Order by abundances mean, from higher to lower.
+    feature_table <- extracted_feature_table[order(rowMeans(extracted_feature_table), decreasing = TRUE),]
+  }else{
+    return(feature_table)
+  }
+}
 
 ###################################################################################################
 
