@@ -24,7 +24,7 @@ barplot_from_feature_table <- function(feature_table){
   
   color_palette <- get_palette()
   
-  ggplot(soil_table_bp, aes(x=sample, y=abundance, fill=bacteria)) + 
+  ggplot(feature_table, aes(x=sample, y=abundance, fill=bacteria)) + 
     geom_bar(position="fill", stat="identity", show.legend = TRUE) +
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
     scale_fill_manual(values=color_palette) +
