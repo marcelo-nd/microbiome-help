@@ -13,7 +13,9 @@ get_palette <- function(nColors = 50){
 
 barplot_from_feature_table <- function(feature_table){
   # Remove columns (samples) with zero count
-  feature_table <- feature_table[, colSums(feature_table != 0) > 0]
+  if (ncol(feature_table) > 1) {
+    feature_table <- feature_table[, colSums(feature_table != 0) > 0]
+  }
   
   # Generate a column with the names of ASVs/OTUs using rownames.
   feature_table["bacteria"] <- row.names(feature_table)
