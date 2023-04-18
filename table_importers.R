@@ -107,7 +107,7 @@ load_biom_as_table <- function(biom_path, tax_rank = "Species", strain_taxonomy 
   if(strain_taxonomy) {
     biom_object <- phyloseq::import_biom(biom_path, parseFunction=parse_taxonomy_strain)
   }else{
-    biom_object <- phyloseq::import_biom(biom_path, parseFunction=parse_taxonomy_greengenes)
+    biom_object <- phyloseq::import_biom(biom_path, parseFunction=phyloseq::parse_taxonomy_greengenes)
   }
   
   extracted_feature_table <- extract_table(biom_object, tax_rank, unite_colNames)

@@ -22,15 +22,15 @@ barplot_from_feature_table <- function(feature_table){
   
   # Gather
   #soil_table_bp <- gather(soil_table_bp, X13114.control.soil.grass.near.BRF:X13114.shade.23.s010 , key = "sample", value = "abundance")
-  feature_table <- gather(feature_table, 1:(ncol(feature_table) - 1) , key = "sample", value = "abundance")
+  feature_table <- tidyr::gather(feature_table, 1:(ncol(feature_table) - 1) , key = "sample", value = "abundance")
   
   color_palette <- get_palette()
   
-  ggplot(feature_table, aes(x=sample, y=abundance, fill=bacteria)) + 
-    geom_bar(position="fill", stat="identity", show.legend = TRUE) +
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-    scale_fill_manual(values=color_palette) +
-    theme(axis.title.x=element_blank(),
-          axis.text.x=element_blank(),
-          axis.ticks.x=element_blank())
+  ggplot2::ggplot(feature_table, ggplot2::aes(x=sample, y=abundance, fill=bacteria)) + 
+    ggplot2::geom_bar(position="fill", stat="identity", show.legend = TRUE) +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 90, vjust = 0.5, hjust=1)) +
+    ggplot2::scale_fill_manual(values=color_palette) +
+    ggplot2::theme(axis.title.x=ggplot2::element_blank(),
+          axis.text.x=ggplot2::element_blank(),
+          axis.ticks.x=ggplot2::element_blank())
 }
