@@ -26,7 +26,7 @@ barplot_from_feature_table <- function(feature_table){
   
   color_palette <- get_palette()
   
-  ggplot2::ggplot(feature_table, ggplot2::aes(x=sample, y=abundance, fill=bacteria)) + 
+  ggplot2::ggplot(feature_table, ggplot2::aes(x=sample, y=abundance, fill=species)) + 
     ggplot2::geom_bar(position="fill", stat="identity", show.legend = TRUE) +
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 90, vjust = 0.5, hjust=1)) +
     ggplot2::scale_fill_manual(values=color_palette) +
