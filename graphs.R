@@ -17,20 +17,41 @@ barplot_from_feature_table <- function(feature_table){
     feature_table <- feature_table[, colSums(feature_table != 0) > 0]
   }
   
+  feature_table2 <- feature_table
+  
   # Generate a column with the names of ASVs/OTUs using rownames.
-  feature_table["bacteria"] <- row.names(feature_table)
+  feature_table2["species"] <- row.names(feature_table2)
+  
+  #print(head(feature_table))
   
   # Gather
-  #soil_table_bp <- gather(soil_table_bp, X13114.control.soil.grass.near.BRF:X13114.shade.23.s010 , key = "sample", value = "abundance")
-  feature_table <- tidyr::gather(feature_table, 1:(ncol(feature_table) - 1) , key = "sample", value = "abundance")
+  feature_table2 <- tidyr::gather(feature_table2, 1:(ncol(feature_table2) - 1) , key = "sample", value = "abundance")
+  
+  
+  print(head(feature_table2))
+  # Keep order of samples in graph
+  feature_table2$sample <- factor(feature_table2$sample, levels = colnames(feature_table))
+  
+  print(head(feature_table2))
   
   color_palette <- get_palette()
   
-  ggplot2::ggplot(feature_table, ggplot2::aes(x=sample, y=abundance, fill=species)) + 
+  ggplot2::ggplot(feature_table2, ggplot2::aes(x=sample, y=abundance, fill=species)) + 
     ggplot2::geom_bar(position="fill", stat="identity", show.legend = TRUE) +
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 90, vjust = 0.5, hjust=1)) +
     ggplot2::scale_fill_manual(values=color_palette) +
-    ggplot2::theme(axis.title.x=ggplot2::element_blank(),
-          axis.text.x=ggplot2::element_blank(),
-          axis.ticks.x=ggplot2::element_blank())
+    ggplot2::theme(plot.title = ggplot2::element_text(size = 12, face = "bold"),
+          legend.title=ggplot2::element_text(size=14), 
+          legend.text=ggplot2::element_text(size=12))
 }
+
+
+ggplot2::ggplot(feature_table, ggplot2::aes(x=sample, y=abundance, fill=species)) + 
+  ggplot2::geom_bar(position="fill", stat="identity", show.legend = TRUE) +
+  ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  ggplot2::scale_fill_manual(values=color_palette) +
+  ggplot2::theme(axis.title.x=ggplot2::element_blank(),
+                 axis.text.x=ggplot2::element_blank(),
+                 axis.ticks.x=ggplot2::element_blank())
+
+
