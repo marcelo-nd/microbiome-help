@@ -1,3 +1,7 @@
+# Install and load packages
+if (!require("readr", quietly = TRUE))
+  install.packages("ggplot2")
+
 get_palette <- function(nColors = 50){
   return(c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
                            "#0072B2","brown1", "#CC79A7", "olivedrab3", "rosybrown",
