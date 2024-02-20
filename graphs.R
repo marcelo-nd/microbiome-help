@@ -2,6 +2,9 @@
 if (!require("ggplot2", quietly = TRUE))
   install.packages("ggplot2")
 
+if (!require("tidyr", quietly = TRUE))
+  install.packages("tidyr")
+
 get_palette <- function(nColors = 50){
   return(c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
                            "#0072B2","brown1", "#CC79A7", "olivedrab3", "rosybrown",
