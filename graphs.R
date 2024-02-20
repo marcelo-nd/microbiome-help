@@ -1,5 +1,5 @@
 # Install and load packages
-if (!require("readr", quietly = TRUE))
+if (!require("ggplot2", quietly = TRUE))
   install.packages("ggplot2")
 
 get_palette <- function(nColors = 50){
