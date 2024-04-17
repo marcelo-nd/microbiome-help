@@ -5,6 +5,9 @@ if (!require("ggplot2", quietly = TRUE))
 if (!require("tidyr", quietly = TRUE))
   install.packages("tidyr")
 
+if (!require("dplyr", quietly = TRUE))
+  install.packages("dplyr")
+
 get_palette <- function(nColors = 50){
   return(c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
                            "#0072B2","brown1", "#CC79A7", "olivedrab3", "rosybrown",
@@ -98,7 +101,7 @@ barplot_from_feature_tables <- function(feature_tables, experiments_names){
   #exp_plot_table$species <- factor(exp_plot_table$species,levels = unique(as.character(exp_plot_table$species)))
   
   exp_plot_table <- exp_plot_table %>%
-    arrange(species)
+    dplyr::arrange(species)
   
   # Reorder factor
   #exp_plot_table$species <- forcats::fct_relevel(exp_plot_table$species, after = 0)
