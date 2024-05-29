@@ -16,6 +16,8 @@ filter_otus_by_counts_col_counts <- function(otu_table, min_count, col_number){
     return(otu_table[which(rowSums(otu_table >= min_count) >= col_number), ])
 }
 
+#to do replace NAs with 0s
+
 sub_otutable <- function(otu_table, sample_indices, sample_names){
   # Select samples defined by user
   sub_otut <- dplyr::select(otu_table, any_of(sample_indices))

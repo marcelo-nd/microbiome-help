@@ -161,3 +161,62 @@ stability_per_period <- function(replicate_data, period_length, time_unit = "day
 }
 
 ###################################################################################################
+
+# Normalize by OD of SynComs
+
+normalize_by_od <- function(dataframe, select_by = "range", select_info){
+  if (select_by == "range" || select_by == "names") {
+    df_normalized <- dataframe %>%
+      mutate(across(all_of(select_info), ~ . / OD)) %>% # to divide based on names list or indices
+      #mutate(across(starts_with("var"), ~ . / div_value)) %>% # to divide variables by pattern in name
+      #select(-div_value)  # Remove the division value column if not needed
+      # Return the normalized dataframe
+      return(df_normalized)
+  }
+  else if (select_by == "numeric") {
+    df_normalized <- dataframe %>%
+      mutate(across(where(is.numeric), ~ . / div_value)) %>% # to divide all numeric variables
+      # Return the normalized dataframe
+      return(df_normalized)
+  }
+  else if (select_by == "pattern") {
+    df_normalized <- dataframe %>%
+      mutate(across(starts_with(select_info), ~ . / div_value)) %>% # to divide variables by pattern in name e.g. "var"
+      # Return the normalized dataframe
+      return(df_normalized)
+  }
+  else{
+    print("select_by value not valid")
+  }
+}
+
+###################################################################################################
+# Remove highly variable metabolites
+
+filter_by_error <- function(dataframe, error_threshold = 50){
+  
+  # Step 1: Calculate the error for each variable per type
+  errors <- dataframe %>%
+    group_by(SynCom) %>%
+    summarise(across(where(is.numeric), ~ (sd(.) / mean(.)) * 100, .names = "error_{col}"))
+  
+  # View the errors dataframe
+  #print(head(errors))
+  
+  # Step 2: Average the error for each variable for all types
+  avg_errors <- errors %>%
+    summarise(across(starts_with("error_"), mean, na.rm = TRUE))
+  
+  # View the average errors dataframe
+  #print(head(avg_errors))
+  
+  variables_to_keep <- names(avg_errors)[avg_errors <= error_threshold]
+  variables_to_keep <- gsub("error_", "", variables_to_keep)
+  
+  # Keep the metadata columns and the variables with error below the threshold
+  df_filtered <- dataframe %>%
+    select(all_of(c("Sample", "SynCom", "Time", "OD", variables_to_keep)))
+  
+  # View the filtered dataframe
+  return(df_filtered)
+}
