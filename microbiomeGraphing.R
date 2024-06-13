@@ -28,7 +28,16 @@ get_palette <- function(nColors = 50){
   #set.seed(1)
 
   return(colors_vec[sample(1:length(colors_vec), size = nColors)])
+}
+
+
+filter_otus_by_counts_col_counts <- function(otu_table, min_count, col_number){
+  if (ncol(otu_table) > 1) {
+    return(otu_table[which(rowSums(otu_table >= min_count) >= col_number), ])
+  }else{
+    return(otu_table)
   }
+}
 
 # to do order alphabetically or by overal abundance.
 barplot_from_feature_table <- function(feature_table){
@@ -89,6 +98,11 @@ barplot_from_feature_tables <- function(feature_tables, experiments_names, share
     
     #print(head(feature_table2)) # check the working feature table
     
+    # Remove rows with Zero counts
+    feature_table2 <- filter_otus_by_counts_col_counts(feature_table2, min_count = 1, col_number = 1)
+    
+    #print(feature_table2)
+    
     # Remove columns (samples) with zero count
     if (ncol(feature_table2) > 1) {
       feature_table2 <- feature_table2[, colSums(feature_table2 != 0) > 0]
@@ -136,7 +150,7 @@ barplot_from_feature_tables <- function(feature_tables, experiments_names, share
   #exp_plot_table$species <- forcats::fct_relevel(exp_plot_table$species, after = 0)
   #exp_plot_table$species <- forcats::fct_rev(exp_plot_table$species)
   
-  print(head(exp_plot_table)) 
+  #print(head(exp_plot_table)) 
   
   # 4) Create and return return graph objects
   # if "shared_samples = TRUE" x-axis is "experiment" then, for each experiment a panel is created and all of their samples are graphed within.
@@ -145,7 +159,7 @@ barplot_from_feature_tables <- function(feature_tables, experiments_names, share
       geom_bar(aes(x = experiment, y = abundance, fill = species),
                position = position_fill(),
                stat = "identity") + 
-      ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 90, vjust = 0.5, hjust=1)) +
+      ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 90, vjust = 0.5, hjust=1, size = 12)) +
       ggplot2::scale_fill_manual(values=get_palette()) + # Get color palette
       ggplot2::theme(plot.title = ggplot2::element_text(size = 12, face = "bold"),
                      legend.title=ggplot2::element_text(size=14), 

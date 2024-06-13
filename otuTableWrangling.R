@@ -13,10 +13,15 @@ filter_otus_by_counts_col_percent <- function(otu_table, min_count, percentage){
 ###################################################################################################
 
 filter_otus_by_counts_col_counts <- function(otu_table, min_count, col_number){
+  if (ncol(otu_table) > 1) {
     return(otu_table[which(rowSums(otu_table >= min_count) >= col_number), ])
+  }else{
+    return(otu_table)
+  }
 }
 
 #to do replace NAs with 0s
+# code on sequencing bar plots nasal syncom script
 
 sub_otutable <- function(otu_table, sample_indices, sample_names){
   # Select samples defined by user
