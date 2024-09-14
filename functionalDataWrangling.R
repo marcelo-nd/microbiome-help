@@ -1,15 +1,15 @@
-install.packages("ggalt")
-
-library(ggplot2)
-library(ggfortify)
-library(plotly)
-
-if (!requireNamespace('BiocManager', quietly = TRUE))
-  install.packages('BiocManager')
-
-BiocManager::install('PCAtools')
-
-source("C:/Users/marce/Documents/GitHub/microbiome-help/functionalDataWrangling.R")
+if (!requireNamespace("ggalt", quietly = TRUE))
+  install.packages("ggalt")
+if (!requireNamespace("ggplot2", quietly = TRUE))
+  install.packages("ggplot2")
+if (!requireNamespace("ggfortify", quietly = TRUE))
+  install.packages("ggfortify")
+if (!requireNamespace("plotly", quietly = TRUE))
+  install.packages("plotly")
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+if (!requireNamespace("PCAtools", quietly = TRUE))
+  install.packages("PCAtools")
 
 get_palette <- function(nColors = 50){
   colors_vec <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442","#0072B2",
@@ -156,66 +156,6 @@ stability_per_period <- function(replicate_data, period_length, time_unit = "day
   return(results_df)
 }
 
-###################################################################################################
-
-# Normalize by OD of SynComs
-
-normalize_by_od <- function(feature_table, select_by = "range", select_info){
-  if (select_by == "range" || select_by == "names") {
-    df_normalized <- feature_table %>%
-      mutate(across(all_of(select_info), ~ . / OD)) %>% # to divide based on names list or indices
-      #mutate(across(starts_with("var"), ~ . / div_value)) %>% # to divide variables by pattern in name
-      #select(-div_value)  # Remove the division value column if not needed
-      # Return the normalized dataframe
-      return(df_normalized)
-  }
-  else if (select_by == "numeric") {
-    df_normalized <- feature_table %>%
-      mutate(across(where(is.numeric), ~ . / div_value)) %>% # to divide all numeric variables
-      # Return the normalized dataframe
-      return(df_normalized)
-  }
-  else if (select_by == "pattern") {
-    df_normalized <- feature_table %>%
-      mutate(across(starts_with(select_info), ~ . / div_value)) %>% # to divide variables by pattern in name e.g. "var"
-      # Return the normalized dataframe
-      return(df_normalized)
-  }
-  else{
-    print("select_by value not valid")
-  }
-}
-
-###################################################################################################
-# Remove highly variable metabolites
-filter_by_error <- function(dataframe, error_threshold = 50){
-  
-  # Step 1: Calculate the error for each variable per type
-  errors <- dataframe %>%
-    group_by(SynCom) %>%
-    summarise(across(where(is.numeric), ~ (sd(.) / mean(.)) * 100, .names = "error_{col}"))
-  
-  # View the errors dataframe
-  #print(head(errors))
-  
-  # Step 2: Average the error for each variable for all types
-  avg_errors <- errors %>%
-    summarise(across(starts_with("error_"), mean, na.rm = TRUE))
-  
-  # View the average errors dataframe
-  #print(head(avg_errors))
-  
-  variables_to_keep <- names(avg_errors)[avg_errors <= error_threshold]
-  variables_to_keep <- gsub("error_", "", variables_to_keep)
-  
-  # Keep the metadata columns and the variables with error below the threshold
-  df_filtered <- dataframe %>%
-    select(all_of(c("Sample", "SynCom", "Time", "OD", variables_to_keep)))
-  
-  # View the filtered dataframe
-  return(df_filtered)
-}
-
 # Read and prepare FIA pos/neg table
 read_fia_table <- function(table_path, sheet = "pos"){
   feature_table <- readxl::read_excel(path = table_path, sheet = "pos", col_names = TRUE)
@@ -238,7 +178,7 @@ read_fia_table <- function(table_path, sheet = "pos"){
 }
 
 ##########################################################
-normalize_by_od2 <- function(feature_table, metadata_table, od_column = "OD", select_by = "all", select_info = NULL){
+normalize_by_od <- function(feature_table, metadata_table, od_column = "OD", select_by = "all", select_info = NULL){
   if (!all.equal(rownames(feature_table),metadata_table$Sample)) {
     print("Sample names in feature table and metadatable are not identical")
     return()
@@ -246,7 +186,7 @@ normalize_by_od2 <- function(feature_table, metadata_table, od_column = "OD", se
     print("Sample names in feature table and metadatable are identical :)")
   }
   
-  dataframe <- cbind(metadata_table[od_column], dataframe)
+  feature_table <- cbind(metadata_table[od_column], feature_table)
 
   if (select_by == "all") {
     df_normalized <- feature_table %>%
@@ -282,7 +222,7 @@ normalize_by_od2 <- function(feature_table, metadata_table, od_column = "OD", se
 }
 
 # Remove highly variable metabolites
-filter_by_error2 <- function(feature_table, metadata_table, grouping_var = NULL, error_threshold = 50){
+filter_by_error <- function(feature_table, metadata_table, grouping_var = NULL, error_threshold = 50){
   # Step 1: Join grouping column in metadata to feature table.
   if (!all.equal(rownames(feature_table),metadata_table$Sample)) {
     print("Sample names in feature table and metadatable are not identical")
@@ -291,7 +231,7 @@ filter_by_error2 <- function(feature_table, metadata_table, grouping_var = NULL,
     print("Sample names in feature table and metadatable are identical :)")
   }
 
-  dataframe <- cbind(metadata_table[grouping_var], feature_table)
+  feature_table <- cbind(metadata_table[grouping_var], feature_table)
   
   # Step 2: Calculate the error for each variable per type
   errors <- feature_table %>%
