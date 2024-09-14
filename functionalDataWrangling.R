@@ -1,3 +1,16 @@
+install.packages("ggalt")
+
+library(ggplot2)
+library(ggfortify)
+library(plotly)
+
+if (!requireNamespace('BiocManager', quietly = TRUE))
+  install.packages('BiocManager')
+
+BiocManager::install('PCAtools')
+
+source("C:/Users/marce/Documents/GitHub/microbiome-help/functionalDataWrangling.R")
+
 get_palette <- function(nColors = 50){
   colors_vec <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442","#0072B2",
                   "brown1", "#CC79A7", "olivedrab3", "rosybrown", "darkorange3",
@@ -307,10 +320,10 @@ filter_by_error2 <- function(feature_table, metadata_table, grouping_var = NULL,
 }
 
 # Do PCA plot
-fia_pca <- function(feature_table, metadata_table, grouping_col){
+fia_pca <- function(feature_table, metadata_table, grouping_col, encircle = FALSE){
   # transposing feature table
   ft_t <- t(feature_table)
-  print(sapply(ft_t, class))
+  #print(sapply(ft_t, class))
   # Step 1: Join grouping column in metadata to feature table.
   if (!all.equal(colnames(ft_t),metadata_table$Sample)) {
     print("Sample names in feature table and metadatable are not identical")
@@ -320,13 +333,13 @@ fia_pca <- function(feature_table, metadata_table, grouping_col){
   }
   metadata_table2 <- as.data.frame(metadata_table)
   rownames(metadata_table2) <- metadata_table2$Sample
-  print(sapply(metadata_table2, class))
+  #print(sapply(metadata_table2, class))
   
   fia_pca <- PCAtools::pca(ft_t, scale = TRUE, metadata =metadata_table2, transposed = FALSE)
 
   p2 <- PCAtools::biplot(fia_pca, showLoadings = TRUE, ntopLoadings = 2, lab = NULL, colby = grouping_col,
-                         legendPosition = "right", legendLabSize = 9, legendIconSize = 2, pointSize = 2,
-                         colkey = get_palette(nColors = 26))
+                         legendPosition = "right", axisLabSize = 8, legendLabSize = 8, legendIconSize = 2, pointSize = 1.5,
+                         colkey = get_palette(nColors = 60), encircle = encircle)
   
   #p2 <- PCAtools::biplot(fia_pca, showLoadings = TRUE, ntopLoadings=2)
   p2
