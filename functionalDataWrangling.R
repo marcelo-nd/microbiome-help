@@ -1,4 +1,24 @@
-
+get_palette <- function(nColors = 50){
+  colors_vec <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442","#0072B2",
+                  "brown1", "#CC79A7", "olivedrab3", "rosybrown", "darkorange3",
+                  "blueviolet", "darkolivegreen4", "lightskyblue4", "navajowhite4",
+                  "purple4", "springgreen4", "firebrick3", "gold3", "cyan3",
+                  "plum", "mediumspringgreen", "blue", "yellow", "#053f73",
+                  "lavenderblush4", "lawngreen", "indianred1", "lightblue1", "honeydew4",
+                  "hotpink", "#e3ae78", "#a23f3f", "#290f76", "#ce7e00",
+                  "#386857", "#738564", "#e89d56", "#cd541d", "#1a3a46",
+                  "#9C4A1A", "#ffe599", "#583E26", "#A78B71", "#F7C815",
+                  "#EC9704", "#4B1E19", "firebrick2", "#C8D2D1", "#14471E",
+                  "#6279B8", "#DA6A00", "#C0587E", "#FC8B5E", "#FEF4C0",
+                  "#EA592A", "khaki3", "lavenderblush3", "indianred4", "lightblue",
+                  "honeydew1", "hotpink4", "ivory3", "#49516F", "#502F4C",
+                  "#A8C686", "#669BBC", "#29335C", "#E4572E", "#F3A712",
+                  "#EF5B5B", "#FFBA49", "#20A39E", "#23001E", "#A4A9AD")
+  
+  #set.seed(1)
+  
+  return(colors_vec[sample(1:length(colors_vec), size = nColors)])
+}
 
 ###################################################################################################
 
@@ -79,42 +99,6 @@ get_replicate_means <- function(replicate_data, id_col_name = NULL, id = NULL, r
 
 ###################################################################################################
 
-get_qnty_from__std <- function(raw_qnts, id_col = NULL, replicates, std_values){
-  # Calcula el valor de una cantidad con base en un std.
-  
-  # create temp df, first col is compound names
-  convtd_qnts <- raw_qnts[1]
-  
-  # if id_col was provided transfer it to convtd_qnts DF.
-  if (!is.null(id_col)) {
-    convtd_qnts[colnames(raw_qnts[id_col])] <- raw_qnts[id_col]
-    # set starting point accordingly if id_col exists in raw_qnts DF
-    starting_point <- 4
-  }else{
-    starting_point <-  3
-  }
-  
-  ending_point <- starting_point + (replicates - 1)
-  
-  # Calculate quantities from stds
-  # for each replicate from staring point to ending point
-  for(col in starting_point:ending_point){
-    # create temporary column
-    temp_col <- c()
-    # for all compound rows in DF
-    for(row in 1:nrow(raw_qnts)){
-      # append value for each calculated compound.
-      # Calculation is a rule of three between compound equivalencies,  standard values. SUBSETTING.
-      temp_col <- c(temp_col, c(std_values[[row, 2]] * raw_qnts[[row, col]] / raw_qnts[[row, 3]]))
-    }
-    # Adding temporary column to cnvt_qnts DF
-    convtd_qnts[colnames(raw_qnts[col])] <- temp_col
-  }
-  return(convtd_qnts)
-}
-
-###################################################################################################
-
 #' Stability per period
 #'
 #' Calculates the mean stability index mean of a functional parameter of replicate data for a period of time.
@@ -128,7 +112,6 @@ get_qnty_from__std <- function(raw_qnts, id_col = NULL, replicates, std_values){
 #'
 #' @examples
 stability_per_period <- function(replicate_data, period_length, time_unit = "day") {
-  
   # Creating empty dataframe where stability measures for each replicate will be stored.
   # Rows are replicates.
   # Columns are "time_unit"(s) (days, etc).
@@ -164,9 +147,9 @@ stability_per_period <- function(replicate_data, period_length, time_unit = "day
 
 # Normalize by OD of SynComs
 
-normalize_by_od <- function(dataframe, select_by = "range", select_info){
+normalize_by_od <- function(feature_table, select_by = "range", select_info){
   if (select_by == "range" || select_by == "names") {
-    df_normalized <- dataframe %>%
+    df_normalized <- feature_table %>%
       mutate(across(all_of(select_info), ~ . / OD)) %>% # to divide based on names list or indices
       #mutate(across(starts_with("var"), ~ . / div_value)) %>% # to divide variables by pattern in name
       #select(-div_value)  # Remove the division value column if not needed
@@ -174,13 +157,13 @@ normalize_by_od <- function(dataframe, select_by = "range", select_info){
       return(df_normalized)
   }
   else if (select_by == "numeric") {
-    df_normalized <- dataframe %>%
+    df_normalized <- feature_table %>%
       mutate(across(where(is.numeric), ~ . / div_value)) %>% # to divide all numeric variables
       # Return the normalized dataframe
       return(df_normalized)
   }
   else if (select_by == "pattern") {
-    df_normalized <- dataframe %>%
+    df_normalized <- feature_table %>%
       mutate(across(starts_with(select_info), ~ . / div_value)) %>% # to divide variables by pattern in name e.g. "var"
       # Return the normalized dataframe
       return(df_normalized)
@@ -192,7 +175,6 @@ normalize_by_od <- function(dataframe, select_by = "range", select_info){
 
 ###################################################################################################
 # Remove highly variable metabolites
-
 filter_by_error <- function(dataframe, error_threshold = 50){
   
   # Step 1: Calculate the error for each variable per type
@@ -220,3 +202,134 @@ filter_by_error <- function(dataframe, error_threshold = 50){
   # View the filtered dataframe
   return(df_filtered)
 }
+
+# Read and prepare FIA pos/neg table
+read_fia_table <- function(table_path, sheet = "pos"){
+  feature_table <- readxl::read_excel(path = table_path, sheet = "pos", col_names = TRUE)
+  # Retain only necessary columns
+  fia_df <- cbind(feature_table[, 2], feature_table[, 5:ncol(feature_table)])
+  # Transpose table
+  fia_df_t <- t(fia_df)
+  # Set column names as metabolites names
+  colnames(fia_df_t) <- fia_df_t[1,]
+  # Remove metnames column
+  fia_df_t <- fia_df_t[2:nrow(fia_df_t),]
+  # Reconvert to dataframe
+  fia_df_t <- as.data.frame(fia_df_t)
+  # Transform to numeric all columns
+  fia_df_t[,1:ncol(fia_df_t)] <- sapply(fia_df_t[,1:ncol(fia_df_t)],as.numeric)
+  # Check the data types of columns
+  #print(sapply(fia_df_t, class))
+  colnames(fia_df_t) <- make.names(colnames(fia_df_t), unique=TRUE)
+  return(fia_df_t)
+}
+
+##########################################################
+normalize_by_od2 <- function(feature_table, metadata_table, od_column = "OD", select_by = "all", select_info = NULL){
+  if (!all.equal(rownames(feature_table),metadata_table$Sample)) {
+    print("Sample names in feature table and metadatable are not identical")
+    return()
+  }else{
+    print("Sample names in feature table and metadatable are identical :)")
+  }
+  
+  dataframe <- cbind(metadata_table[od_column], dataframe)
+
+  if (select_by == "all") {
+    df_normalized <- feature_table %>%
+      mutate(across(where(is.numeric), ~ . / OD)) # to divide based on names list or indices
+    return(select(df_normalized, c(2:length(df_normalized))))
+  }
+  else if (select_by == "range") {
+    #print(c((select_info[1]+1):(select_info[2]+1)))
+    #test_df <- select(dataframe, c((select_info[1]+1):(select_info[2])))
+    #print(select(dataframe, c((select_info[1]+1):(select_info[2]+1))))
+    df_normalized <- feature_table %>%
+      mutate(across(all_of(c((select_info[1]+1):(select_info[2]))), ~ . / OD)) # to divide based on names list or indices
+      #mutate(across(starts_with("var"), ~ . / div_value)) %>% # to divide variables by pattern in name
+      #select(-div_value)  # Remove the division value column if not needed
+      # Return the normalized dataframe
+    return(select(df_normalized, c(2:length(df_normalized))))
+  }
+  else if (select_by == "numeric") {
+    df_normalized <- feature_table %>%
+      mutate(across(where(is.numeric), ~ . / div_value)) %>% # to divide all numeric variables
+      # Return the normalized dataframe
+      return(df_normalized)
+  }
+  else if (select_by == "pattern") {
+    df_normalized <- feature_table %>%
+      mutate(across(starts_with(select_info), ~ . / div_value)) %>% # to divide variables by pattern in name e.g. "var"
+      # Return the normalized dataframe
+      return(df_normalized)
+  }
+  else{
+    print("select_by value not valid")
+  }
+}
+
+# Remove highly variable metabolites
+filter_by_error2 <- function(feature_table, metadata_table, grouping_var = NULL, error_threshold = 50){
+  # Step 1: Join grouping column in metadata to feature table.
+  if (!all.equal(rownames(feature_table),metadata_table$Sample)) {
+    print("Sample names in feature table and metadatable are not identical")
+    return()
+  }else{
+    print("Sample names in feature table and metadatable are identical :)")
+  }
+
+  dataframe <- cbind(metadata_table[grouping_var], feature_table)
+  
+  # Step 2: Calculate the error for each variable per type
+  errors <- feature_table %>%
+    group_by(SynCom) %>%
+    summarise(across(where(is.numeric), ~ (sd(.) / mean(.)) * 100, .names = "error_{col}"))
+  
+  # View the errors dataframe
+  #print(head(errors))
+  
+  # Step 3: Average the error for each variable for all types
+  avg_errors <- errors %>%
+    summarise(across(starts_with("error_"), mean, na.rm = TRUE))
+  
+  # View the average errors dataframe
+  #print(head(avg_errors))
+  
+  variables_to_keep <- names(avg_errors)[avg_errors <= error_threshold]
+  variables_to_keep <- gsub("error_", "", variables_to_keep)
+  
+  # Keep the metadata columns and the variables with error below the threshold
+  df_filtered <- feature_table %>%
+    select(all_of(variables_to_keep))
+  
+  # View the filtered dataframe
+  return(df_filtered)
+}
+
+# Do PCA plot
+fia_pca <- function(feature_table, metadata_table, grouping_col){
+  # transposing feature table
+  ft_t <- t(feature_table)
+  print(sapply(ft_t, class))
+  # Step 1: Join grouping column in metadata to feature table.
+  if (!all.equal(colnames(ft_t),metadata_table$Sample)) {
+    print("Sample names in feature table and metadatable are not identical")
+    return()
+  }else{
+    print("Sample names in feature table and metadatable are identical :)")
+  }
+  metadata_table2 <- as.data.frame(metadata_table)
+  rownames(metadata_table2) <- metadata_table2$Sample
+  print(sapply(metadata_table2, class))
+  
+  fia_pca <- PCAtools::pca(ft_t, scale = TRUE, metadata =metadata_table2, transposed = FALSE)
+
+  p2 <- PCAtools::biplot(fia_pca, showLoadings = TRUE, ntopLoadings = 2, lab = NULL, colby = grouping_col,
+                         legendPosition = "right", legendLabSize = 9, legendIconSize = 2, pointSize = 2,
+                         colkey = get_palette(nColors = 26))
+  
+  #p2 <- PCAtools::biplot(fia_pca, showLoadings = TRUE, ntopLoadings=2)
+  p2
+}
+
+

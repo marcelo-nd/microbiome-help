@@ -30,10 +30,13 @@ get_palette <- function(nColors = 50){
   return(colors_vec[sample(1:length(colors_vec), size = nColors)])
 }
 
-
 filter_otus_by_counts_col_counts <- function(otu_table, min_count, col_number){
+  species_names <- rownames(otu_table)
   if (ncol(otu_table) > 1) {
-    return(otu_table[which(rowSums(otu_table >= min_count) >= col_number), ])
+    species_names <- rownames(otu_table)
+    new_otu_table <- otu_table[which(rowSums(otu_table >= min_count) >= col_number), ]
+    row.names(new_otu_table) <- species_names
+    return(new_otu_table)
   }else{
     return(otu_table)
   }
@@ -41,17 +44,22 @@ filter_otus_by_counts_col_counts <- function(otu_table, min_count, col_number){
 
 # to do order alphabetically or by overal abundance.
 barplot_from_feature_table <- function(feature_table){
+  
+  # Remove empty rows (species)
+  feature_table2 <- filter_otus_by_counts_col_counts(feature_table, min_count = 1, col_number = 1)
+  
+  # Saves species names from row_names
+  species <- row.names(feature_table2)
+  
   # Remove columns (samples) with zero count
-  if (ncol(feature_table) > 1) {
-    feature_table <- feature_table[, colSums(feature_table != 0) > 0]
+  if (ncol(feature_table2) > 1) {
+    feature_table2 <- feature_table2[, colSums(feature_table2 != 0) > 0]
   }
-  
-  feature_table2 <- feature_table
-  
+
   # Generate a column with the names of ASVs/OTUs using rownames.
-  feature_table2["species"] <- row.names(feature_table2)
+  feature_table2["species"] <- species
   
-  #print(head(feature_table))
+  print(head(feature_table))
   
   # Gather
   feature_table2 <- tidyr::gather(feature_table2, 1:(ncol(feature_table2) - 1) , key = "sample", value = "abundance")
@@ -99,9 +107,12 @@ barplot_from_feature_tables <- function(feature_tables, experiments_names, share
     #print(head(feature_table2)) # check the working feature table
     
     # Remove rows with Zero counts
-    feature_table2 <- filter_otus_by_counts_col_counts(feature_table2, min_count = 1, col_number = 1)
+    feature_table2 <- filter_otus_by_counts_col_counts(feature_table2, min_count = 10, col_number = ncol(feature_table2))
     
-    #print(feature_table2)
+    print(head(feature_table2))
+    
+    # save names of species
+    species_names <- row.names(feature_table2)
     
     # Remove columns (samples) with zero count
     if (ncol(feature_table2) > 1) {
@@ -109,7 +120,8 @@ barplot_from_feature_tables <- function(feature_tables, experiments_names, share
     }
     
     # Create a column with the names of ASVs/OTUs using rownames.
-    feature_table2["species"] <- row.names(feature_table2)
+    feature_table2["species"] <- species_names
+    print(feature_table2$species)
     
     # Use dplyr gather the working feature table.
     feature_table_g <- tidyr::gather(feature_table2, 1:(ncol(feature_table2) - 1) , key = "sample", value = "abundance")
@@ -118,6 +130,8 @@ barplot_from_feature_tables <- function(feature_tables, experiments_names, share
     
     # Create a column to keep track of from which experiment/treatment the samples come from.
     feature_table_g$experiment <- experiments_names[table] # the experiment name is taken from experiments_names vector
+    
+    #print(head(feature_table_g))
     
     # rbind the gathered feature tables.
     # Result is exp_plot_table, a table containing in each row species;sample;abundance;experiment data for all tables to make a barplot.
