@@ -1,3 +1,4 @@
+# install and load packages
 if (!requireNamespace("ggalt", quietly = TRUE))
   install.packages("ggalt")
 if (!requireNamespace("ggplot2", quietly = TRUE))
@@ -10,8 +11,35 @@ if (!requireNamespace("BiocManager", quietly = TRUE))
   install.packages("BiocManager")
 if (!requireNamespace("PCAtools", quietly = TRUE))
   install.packages("PCAtools")
+if (!requireNamespace("docstring", quietly = TRUE))
+  install.packages("docstring")
+if (!"stringr" %in% installed.packages()) install.packages("stringr")
+
+library("docstring")
 
 get_palette <- function(nColors = 50){
+  #' @title Get random colors for plotting.
+  #'
+  #' @description Returns a vector of "nCOlors" number random of colors to work in ggplot2. Max colors to ask for is 60.
+  #' @param nCOlors integer. The number of colors to return.
+  #' @value A vector of nColors.
+  #' @details
+    #' The list of colors is:
+    #' "#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442","#0072B2",
+    #' "brown1", "#CC79A7", "olivedrab3", "rosybrown", "darkorange3",
+    #' "blueviolet", "darkolivegreen4", "lightskyblue4", "navajowhite4",
+    #' "purple4", "springgreen4", "firebrick3", "gold3", "cyan3",
+    #' "plum", "mediumspringgreen", "blue", "yellow", "#053f73",
+    #' "lavenderblush4", "lawngreen", "indianred1", "lightblue1", "honeydew4",
+    #' "hotpink", "#e3ae78", "#a23f3f", "#290f76", "#ce7e00",
+    #' "#386857", "#738564", "#e89d56", "#cd541d", "#1a3a46",
+    #' "#9C4A1A", "#ffe599", "#583E26", "#A78B71", "#F7C815",
+    #' "#EC9704", "#4B1E19", "firebrick2", "#C8D2D1", "#14471E",
+    #' "#6279B8", "#DA6A00", "#C0587E", "#FC8B5E", "#FEF4C0",
+    #' "#EA592A", "khaki3", "lavenderblush3", "indianred4", "lightblue",
+    #' "honeydew1", "hotpink4", "ivory3", "#49516F", "#502F4C",
+    #' "#A8C686", "#669BBC", "#29335C", "#E4572E", "#F3A712",
+    #' "#EF5B5B", "#FFBA49", "#20A39E", "#23001E", "#A4A9AD
   colors_vec <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442","#0072B2",
                   "brown1", "#CC79A7", "olivedrab3", "rosybrown", "darkorange3",
                   "blueviolet", "darkolivegreen4", "lightskyblue4", "navajowhite4",
@@ -36,12 +64,16 @@ get_palette <- function(nColors = 50){
 ###################################################################################################
 
 get_replicate_means <- function(replicate_data, id_col_name = NULL, id = NULL, replicates, subreplicates = 2, standard = TRUE){
+  #' @title Calculate the means of treatments .
+  #'
+  #' @description Returns a vector of "nCOlors" number random of colors to work in ggplot2. Max colors to ask for is 60.
+  #' @param nCOlors integer. The number of colors to return.
+  #' @value A DF containing one column per type of sample.
+  #' @details
   # Takes the mean of "subreplicates" number of observations for "replicates" number of replicates
-  # Receives optional ID name (id_col_name), ID for group (id), replicates number and sureplicates to teake the mean.
-  # Returns df
+  # Receives optional ID name (id_col_name), ID for group (id), replicates number and subreplicates to calculate the mean from.
+  # 
   
-  # Installing required packages
-  if (!"stringr" %in% installed.packages()) install.packages("stringr")
   
   # create means df, first col is compound names
   means <- replicate_data[1]
@@ -111,20 +143,20 @@ get_replicate_means <- function(replicate_data, id_col_name = NULL, id = NULL, r
 }
 
 ###################################################################################################
-
-#' Stability per period
-#'
-#' Calculates the mean stability index mean of a functional parameter of replicate data for a period of time.
-#'
-#' @param replicate_data 
-#' @param period_length
-#' @param time_unit
-#'
-#' @return Dataframe where rows are replicates and columns are "time_unit"(s) (days, etc). Each entry corresponds to the stability index of the period including the current time and previous "period_length" time units.
-#' @export
-#'
-#' @examples
 stability_per_period <- function(replicate_data, period_length, time_unit = "day") {
+  #' Stability per period
+  #'
+  #' Calculates the mean stability index mean of a functional parameter of replicate data for a period of time.
+  #'
+  #' @param replicate_data 
+  #' @param period_length
+  #' @param time_unit
+  #'
+  #' @return Dataframe where rows are replicates and columns are "time_unit"(s) (days, etc). Each entry corresponds to the stability index of the period including the current time and previous "period_length" time units.
+  #' @export
+  #'
+  #' @examples
+
   # Creating empty dataframe where stability measures for each replicate will be stored.
   # Rows are replicates.
   # Columns are "time_unit"(s) (days, etc).
@@ -179,6 +211,18 @@ read_fia_table <- function(table_path, sheet = "pos"){
 
 ##########################################################
 normalize_by_od <- function(feature_table, metadata_table, od_column = "OD", select_by = "all", select_info = NULL){
+  #' @title Normalize by OD
+  #' @description
+    #' Normalizes a feature table using OD measurements.
+    #' 
+  #' @param feature_table A dataframe containing samples in rows and features in columns.
+  #' @param metadata_table A dataframe containing samples in columns and variables in rows. One row should be the OD values for all samples in feature_table (default = "OD").
+  #' @param od_column String. Name of column containing OD values for all samples. By default is named "OD".
+  #' @param select_by String. String indicating the way to select columns to normalize ("all", "range", "pattern").
+  #' @param select_info Vector/string. If other than "all" selected as select_by, this is used to select columns to normalize.
+  #' @return Dataframe where rows are samples and columns are features. Features are normalized by OD values in metadata_table
+  #'
+
   if (!all.equal(rownames(feature_table),metadata_table$Sample)) {
     print("Sample names in feature table and metadatable are not identical")
     return()

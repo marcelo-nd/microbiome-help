@@ -31,11 +31,8 @@ get_palette <- function(nColors = 50){
 }
 
 filter_otus_by_counts_col_counts <- function(otu_table, min_count, col_number){
-  species_names <- rownames(otu_table)
   if (ncol(otu_table) > 1) {
-    species_names <- rownames(otu_table)
-    new_otu_table <- otu_table[which(rowSums(otu_table >= min_count) >= col_number), ]
-    row.names(new_otu_table) <- species_names
+    new_otu_table <- otu_table[which(rowSums(otu_table[ncol(otu_table)] >= min_count) >= col_number), ]
     return(new_otu_table)
   }else{
     return(otu_table)
@@ -99,6 +96,7 @@ barplot_from_feature_tables <- function(feature_tables, experiments_names, share
   #print(head(feature_tables)) # check the list of feature tables
   
   # 1) Clean, join and gather the otu tables.
+  sample_names = c()
   for (table in seq(from = 1, to = length(feature_tables), by=1)) {
 
     # copy feature table to avoid modifying the original table.
@@ -107,9 +105,9 @@ barplot_from_feature_tables <- function(feature_tables, experiments_names, share
     #print(head(feature_table2)) # check the working feature table
     
     # Remove rows with Zero counts
-    feature_table2 <- filter_otus_by_counts_col_counts(feature_table2, min_count = 10, col_number = ncol(feature_table2))
+    feature_table2 <- filter_otus_by_counts_col_counts(feature_table2, min_count = 1, 1)
     
-    print(head(feature_table2))
+    #print(head(feature_table2))
     
     # save names of species
     species_names <- row.names(feature_table2)
@@ -118,6 +116,8 @@ barplot_from_feature_tables <- function(feature_tables, experiments_names, share
     if (ncol(feature_table2) > 1) {
       feature_table2 <- feature_table2[, colSums(feature_table2 != 0) > 0]
     }
+    
+    sample_names <- c(sample_names, colnames(feature_table2))
     
     # Create a column with the names of ASVs/OTUs using rownames.
     feature_table2["species"] <- species_names
@@ -142,15 +142,20 @@ barplot_from_feature_tables <- function(feature_tables, experiments_names, share
     }
   }
   
+  print(sample_names)
   #print(head(exp_plot_table)) # check gathered table
   
   # 2) Keep order of treatments and species
   # Keep order of experiments in graph
   exp_plot_table$experiment <- factor(exp_plot_table$experiment, levels = experiments_names)
   
+  print(head(exp_plot_table))
+  
   # If samples are shared, keep order of samples in graph
   if (shared_samples) {
     exp_plot_table$sample <- factor(exp_plot_table$sample, levels = colnames(feature_table2))
+  } else{
+    exp_plot_table$sample <- factor(exp_plot_table$sample, levels = sample_names)
   }
   
   #print(head(exp_plot_table)) # check plot table
@@ -181,7 +186,7 @@ barplot_from_feature_tables <- function(feature_tables, experiments_names, share
       facet_grid(~sample)
     otu_barplot
     return(otu_barplot)
-  } else{ # if "shared_samples = FALSE" x-axis is "sample" then, a panel is created for each sample, and one sample from each of the traetments/runs are graphed within.
+  } else{ # if "shared_samples = FALSE" x-axis is "sample" then, a panel is created for each sample, and one sample from each of the treatments/runs are graphed within.
   otu_barplot <- ggplot(exp_plot_table) +
     geom_bar(aes(x = sample, y = abundance, fill = species),
              position = position_fill(),
