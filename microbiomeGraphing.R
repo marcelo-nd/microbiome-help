@@ -8,7 +8,7 @@ if (!require("tidyr", quietly = TRUE))
 if (!require("dplyr", quietly = TRUE))
   install.packages("dplyr")
 
-get_palette <- function(nColors = 50){
+get_palette <- function(nColors = 60){
   colors_vec <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442","#0072B2",
     "brown1", "#CC79A7", "olivedrab3", "rosybrown", "darkorange3",
     "blueviolet", "darkolivegreen4", "lightskyblue4", "navajowhite4",

@@ -307,26 +307,32 @@ filter_by_error <- function(feature_table, metadata_table, grouping_var = NULL, 
 fia_pca <- function(feature_table, metadata_table, grouping_col, encircle = FALSE){
   # transposing feature table
   ft_t <- t(feature_table)
+  #print(head(ft_t))
   #print(sapply(ft_t, class))
+  print(colnames(ft_t))
+  print(metadata_table$Sample)
+  #print(all.equal(colnames(ft_t),metadata_table$Sample))
   # Step 1: Join grouping column in metadata to feature table.
-  if (!all.equal(colnames(ft_t),metadata_table$Sample)) {
-    print("Sample names in feature table and metadatable are not identical")
-    return()
-  }else{
+  if (isTRUE(all.equal(colnames(ft_t),metadata_table$Sample))) {
     print("Sample names in feature table and metadatable are identical :)")
+    
+    metadata_table2 <- as.data.frame(metadata_table)
+    rownames(metadata_table2) <- metadata_table2$Sample
+    #print(sapply(metadata_table2, class))
+    
+    fia_pca <- PCAtools::pca(ft_t, scale = TRUE, metadata =metadata_table2, transposed = FALSE)
+    
+    p2 <- PCAtools::biplot(fia_pca, showLoadings = TRUE, ntopLoadings = 2, lab = NULL, colby = grouping_col,
+                           legendPosition = "right", axisLabSize = 8, legendLabSize = 8, legendIconSize = 2, pointSize = 1.5,
+                           colkey = get_palette(nColors = 60), encircle = encircle)
+    
+    #p2 <- PCAtools::biplot(fia_pca, showLoadings = TRUE, ntopLoadings=2)
+    p2
+    
+  }else{
+    print("Sample names in feature table and metadatable are not identical")
+    print(all.equal(colnames(ft_t),metadata_table$Sample))
+    #return()
   }
-  metadata_table2 <- as.data.frame(metadata_table)
-  rownames(metadata_table2) <- metadata_table2$Sample
-  #print(sapply(metadata_table2, class))
   
-  fia_pca <- PCAtools::pca(ft_t, scale = TRUE, metadata =metadata_table2, transposed = FALSE)
-
-  p2 <- PCAtools::biplot(fia_pca, showLoadings = TRUE, ntopLoadings = 2, lab = NULL, colby = grouping_col,
-                         legendPosition = "right", axisLabSize = 8, legendLabSize = 8, legendIconSize = 2, pointSize = 1.5,
-                         colkey = get_palette(nColors = 60), encircle = encircle)
-  
-  #p2 <- PCAtools::biplot(fia_pca, showLoadings = TRUE, ntopLoadings=2)
-  p2
 }
-
-
