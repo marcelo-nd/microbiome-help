@@ -32,6 +32,11 @@ get_palette <- function(nColors = 60){
 
 filter_otus_by_counts_col_counts <- function(otu_table, min_count, col_number){
   if (ncol(otu_table) > 1) {
+    row_num_passed <- which(rowSums(otu_table[ncol(otu_table)] >= min_count) >= col_number)
+    
+    print(rowSums(otu_table[ncol(otu_table)] >= min_count))
+    print(row_num_passed)
+                                    
     new_otu_table <- otu_table[which(rowSums(otu_table[ncol(otu_table)] >= min_count) >= col_number), ]
     return(new_otu_table)
   }else{
@@ -40,11 +45,11 @@ filter_otus_by_counts_col_counts <- function(otu_table, min_count, col_number){
 }
 
 # to do order alphabetically or by overal abundance.
-barplot_from_feature_table <- function(feature_table){
+barplot_from_feature_table <- function(feature_table, color_palette=NULL){
   
   # Remove empty rows (species)
-  feature_table2 <- filter_otus_by_counts_col_counts(feature_table, min_count = 1, col_number = 1)
-  
+  #feature_table2 <- filter_otus_by_counts_col_counts(feature_table, min_count = 1, col_number = 1)
+  feature_table2 <- feature_table
   # Saves species names from row_names
   species <- row.names(feature_table2)
   
@@ -68,15 +73,17 @@ barplot_from_feature_table <- function(feature_table){
   
   print(head(feature_table2))
   
-  color_palette <- get_palette(nColors = nrow(feature_table))
+  if (is.null(color_palette)) {
+    color_palette <- get_palette(nColors = nrow(feature_table))
+  }
   
   otu_barplot <- ggplot2::ggplot(feature_table2, ggplot2::aes(x=sample, y=abundance, fill=species)) + 
     ggplot2::geom_bar(position="fill", stat="identity", show.legend = TRUE) +
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 90, vjust = 0.5, hjust=1)) +
     ggplot2::scale_fill_manual(values=color_palette) +
     ggplot2::theme(plot.title = ggplot2::element_text(size = 12, face = "bold"),
-          legend.title=ggplot2::element_text(size=14), 
-          legend.text=ggplot2::element_text(size=12))
+          legend.title=ggplot2::element_text(size=10), 
+          legend.text=ggplot2::element_text(size=08))
   otu_barplot
   return(otu_barplot)
 }
