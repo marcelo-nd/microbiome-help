@@ -124,12 +124,12 @@ barplot_from_feature_table_sorted <- function(feature_table, colour_palette = NU
       ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 90, vjust = 0.5, hjust=1)) +
       ggplot2::scale_fill_manual(values=colour_palette) +
       ggplot2::theme(plot.title = ggplot2::element_text(size = 10, face = "bold"),
-                     legend.position="bottom",
+                     legend.position="right",
                      legend.title=ggplot2::element_text(size=10), 
                      legend.text=ggplot2::element_text(size=8),
                      axis.text.x = ggplot2::element_text(angle = 90, vjust = 0.5, hjust=1, size=8),
                      axis.text.y = ggplot2::element_text(size=8)) +
-      guides(fill = guide_legend(ncol = 3))
+      guides(fill = guide_legend(ncol = 1))
     
   }else if (sort_type == "similarity") {
     print("Sort samples by similarity")
@@ -141,8 +141,10 @@ barplot_from_feature_table_sorted <- function(feature_table, colour_palette = NU
     # Min-max scaling
     df2 <- feature_table
     normalize = function(x) (x- min(x))/(max(x) - min(x))
-    cols <- sapply(otu_table_adjusted, is.numeric)
-    df2[cols] <- lapply(otu_table_adjusted[cols], normalize)
+    cols <- sapply(feature_table, is.numeric)
+    df2[cols] <- lapply(feature_table[cols], normalize)
+    #cols <- sapply(otu_table_adjusted, is.numeric)
+    #df2[cols] <- lapply(otu_table_adjusted[cols], normalize)
     
     df2 <- df2 %>% rownames_to_column(var = "Species")
     
@@ -167,12 +169,12 @@ barplot_from_feature_table_sorted <- function(feature_table, colour_palette = NU
       ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 90, vjust = 0.5, hjust=1)) +
       ggplot2::scale_fill_manual(values=colour_palette) +
       ggplot2::theme(plot.title = ggplot2::element_text(size = 10, face = "bold"),
-                     legend.position="bottom",
+                     legend.position="right",
                      legend.title=ggplot2::element_text(size=10), 
                      legend.text=ggplot2::element_text(size=8),
                      axis.text.x = ggplot2::element_text(angle = 90, vjust = 0.5, hjust=1, size=8),
                      axis.text.y = ggplot2::element_text(size=8)) +
-      guides(fill = guide_legend(ncol = 3))
+      guides(fill = guide_legend(ncol = 1))
     otu_barplot
     
   }else{
@@ -184,7 +186,11 @@ barplot_from_feature_table_sorted <- function(feature_table, colour_palette = NU
   return(otu_barplot)
 }
 
-barplot_from_feature_tables <- function(feature_tables, experiments_names, colour_palette = NULL, shared_samples = FALSE){
+barplot_from_feature_tables <- function(feature_tables, experiments_names, x_axis_text_size = 12,
+                                        y_axis_text_size = 12, legend_title_size = 12,
+                                        x_axis_title_size = 12, y_axis_title_size = 12,
+                                        legend_text_size = 12, plot_title = "", plot_title_size = 14,
+                                        colour_palette = NULL, shared_samples = FALSE){
   # CreateS a barplot with panels from several otu tables. This otu tables can correspond to different experiments, runs or treatments.
   # Use "shared_samples = FALSE" to treat each otu table as different experiments.Then, each sample in a table is treated as a replicate.
   # In this case, experiment_names are used to name the panels and samples per otu_table are graphed in their corresponding panel.
@@ -261,6 +267,7 @@ barplot_from_feature_tables <- function(feature_tables, experiments_names, colou
     exp_plot_table$sample <- factor(exp_plot_table$sample, levels = sample_names)
   }
   
+  
   #print(head(exp_plot_table)) # check plot table
   
   # 3) Order the rows of a data frame by the species alphabetical order.
@@ -286,26 +293,35 @@ barplot_from_feature_tables <- function(feature_tables, experiments_names, colou
       geom_bar(aes(x = experiment, y = abundance, fill = species),
                position = position_fill(),
                stat = "identity") + 
-      ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 90, vjust = 0.5, hjust=1, size = 12)) +
+      ggtitle(plot_title) +
+      ggplot2::theme(plot.title = ggplot2::element_text(size = plot_title_size, face = "bold", hjust = 0.5, vjust = 0.5),
+                     axis.title.x = ggplot2::element_text(size=x_axis_title_size),
+                     axis.text.x = ggplot2::element_text(angle = 90, vjust = 0.5, hjust=1, size = x_axis_text_size),
+                     axis.title.y = ggplot2::element_text(size=y_axis_title_size),
+                     axis.text.y = ggplot2::element_text(size = x_axis_text_size),
+                     legend.title=ggplot2::element_text(size=legend_title_size),
+                     legend.text=ggplot2::element_text(size=legend_text_size),
+                     legend.position="bottom") +
       ggplot2::scale_fill_manual(values=colour_palette) + # Get color palette
-      ggplot2::theme(plot.title = ggplot2::element_text(size = 12, face = "bold"),
-                     legend.title=ggplot2::element_text(size=14), 
-                     legend.text=ggplot2::element_text(size=12)) +
-      facet_grid(~sample)
+      facet_grid(~sample) +
+      guides(fill = guide_legend(ncol = 3))
     otu_barplot
     return(otu_barplot)
   } else{ # if "shared_samples = FALSE" x-axis is "sample" then, a panel is created for each sample, and one sample from each of the treatments/runs are graphed within.
   otu_barplot <- ggplot(exp_plot_table) +
     geom_bar(aes(x = sample, y = abundance, fill = species),
              position = position_fill(),
-             stat = "identity") + 
-    ggplot2::theme(axis.text.x = ggplot2::element_text(size=8, angle = 90, vjust = 0.5, hjust=1),
-                   axis.text.y = ggplot2::element_text(size=8)) +
+             stat = "identity") +
+    ggtitle(plot_title) +
+    ggplot2::theme(plot.title = ggplot2::element_text(size = plot_title_size, face = "bold", hjust = 0.5, vjust = 0.5),
+                   axis.title.x = ggplot2::element_text(size=x_axis_title_size),
+                   axis.text.x = ggplot2::element_text(angle = 90, vjust = 0.5, hjust=1, size = x_axis_text_size),
+                   axis.title.y = ggplot2::element_text(size=y_axis_title_size),
+                   axis.text.y = ggplot2::element_text(size = x_axis_text_size),
+                   legend.title=ggplot2::element_text(size=legend_title_size),
+                   legend.text=ggplot2::element_text(size=legend_text_size),
+                   legend.position="bottom") +
     ggplot2::scale_fill_manual(values=colour_palette) + # Get color palette
-    ggplot2::theme(plot.title = ggplot2::element_text(size = 12, face = "bold"),
-                   legend.position="bottom",
-                   legend.title=ggplot2::element_text(size=10), 
-                   legend.text=ggplot2::element_text(size=8)) +
     facet_grid(~experiment, scales = "free", space = "free") + # this is to remove empty factors due to samples being named differently
     guides(fill = guide_legend(ncol = 3))
   otu_barplot
