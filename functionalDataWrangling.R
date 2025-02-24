@@ -14,13 +14,17 @@ if (!requireNamespace("PCAtools", quietly = TRUE))
 if (!requireNamespace("docstring", quietly = TRUE))
   install.packages("docstring")
 if (!"dplyr" %in% installed.packages()) install.packages("dplyr")
+if (!"vegan" %in% installed.packages()) install.packages("vegan")
 if (!"stringr" %in% installed.packages()) install.packages("stringr")
+if (!"readxl" %in% installed.packages()) install.packages("readxl")
 
 library("docstring")
+library("dplyr")
+library("ggplot2")
 
 ##### File parsing
 # Read and prepare FIA pos/neg table
-read_fia_table <- function(table_path, sheet = "pos", fix_names = FALSE){
+read_fia_table <- function(table_path, sheet = "pos", fix_names = FALSE, sort_table = TRUE){
   feature_table <- readxl::read_excel(path = table_path, sheet = "pos", col_names = TRUE)
   # Retain only necessary columns
   fia_df <- cbind(feature_table[, 2], feature_table[, 5:ncol(feature_table)])
@@ -39,6 +43,11 @@ read_fia_table <- function(table_path, sheet = "pos", fix_names = FALSE){
   if (fix_names) {
     colnames(fia_df_t) <- make.names(colnames(fia_df_t), unique=TRUE)
   }
+  
+  if (isTRUE(sort_table)) {
+    fia_df_t <- fia_df_t[order(row.names(fia_df_t)), ] # sort my row names (sample names)
+  }
+  
   return(fia_df_t)
 }
 
@@ -51,9 +60,22 @@ read_ft_1 <- function(path, sort_by_names = FALSE){
   return(ft)
 }
 
-read_metadata <- function(path, sort_by_names = FALSE){
+read_metadata <- function(path, sort_table = FALSE){
   md <- read.csv(path, row.names = 1)
-  if(isTRUE(sort_by_names)){
+  if(isTRUE(sort_table)){
+    md <- md[order(row.names(md)), ] # sort my row names (sample names)
+  }
+  return(md)
+}
+
+read_metadata_xls <- function(path, sheet, sort_table = FALSE){
+  md <- readxl::read_excel(path, sheet = sheet)
+  
+  md <- as.data.frame(md)
+  row.names(md) <- md[,1]
+  md <- md[2:ncol(md)]
+  
+  if(isTRUE(sort_table)){
     md <- md[order(row.names(md)), ] # sort my row names (sample names)
   }
   return(md)
@@ -165,7 +187,7 @@ ft_pca_1 <- function(feature_table, metadata_table, grouping_col, encircle = FAL
 
 ft_pca_2 <- function(feature_table, metadata_table, grouping_col = NULL, p_shape = NULL, dist_method = "euclidean"){
   # Compute distance matrix according to dist_method
-  dist_matrix <- vegdist(feature_table, method = dist_method)
+  dist_matrix <- vegan::vegdist(feature_table, method = dist_method)
   
   # Perform PCoA
   pcoa_results <- cmdscale(dist_matrix, k = 2, eig = TRUE)
@@ -258,7 +280,7 @@ extract_features_comparison <- function(feature_table, sig_features, columns_to_
 }
 
 ##########################################################
-normalize_by_od <- function(feature_table, metadata_table, samples_group_to_exclude = NULL, select_by = "all", od_column = "od", select_info = NULL){
+normalize_by_od <- function(feature_table, metadata_table, samples_group_to_exclude = NULL, grouping_variable = NULL, select_by = "all", od_column = "od"){
   #' @title Normalize by OD
   #' @description
   #' Normalizes a feature table using OD measurements.
@@ -274,7 +296,7 @@ normalize_by_od <- function(feature_table, metadata_table, samples_group_to_excl
   #print(metadata_table$sample)
   #print(isTRUE(all.equal(row.names(feature_table), metadata_table$sample)))
   
-  if (!isTRUE(all.equal(row.names(feature_table), metadata_table$sample))) {
+  if (!isTRUE(all.equal(row.names(feature_table), row.names(metadata_table)))) {
     print("Sample names in feature table and metadatable are not identical")
     return()
   }else{
@@ -285,9 +307,14 @@ normalize_by_od <- function(feature_table, metadata_table, samples_group_to_excl
   
   #print(head(feature_table))
   
-  if (!is.null(samples_group_to_exclude)) {
-    filtered_df <- feature_table[!metadata_table$syncom %in% samples_group_to_exclude, ]
-    filtered_metadata <- metadata_table[!metadata_table$syncom %in% samples_group_to_exclude, ]
+  if (!is.null(grouping_variable) && !is.null(samples_group_to_exclude)) {
+    # To do, get the sample names that are part of the grouping variable
+    samples_exclude <- rownames(feature_table)[metadata_table[[grouping_variable]] %in% samples_group_to_exclude]
+    #print(samples_exclude)
+    #filtered_df <- feature_table[!metadata_table$syncom %in% samples_group_to_exclude, ]
+    #filtered_metadata <- metadata_table[!metadata_table$syncom %in% samples_group_to_exclude, ]
+    filtered_df <- feature_table[!row.names(metadata_table) %in% samples_exclude, ]
+    filtered_metadata <- metadata_table[!row.names(metadata_table) %in% samples_exclude, ]
     od_values <- as.vector(filtered_metadata$od)
   }else{
     od_values <- as.vector(metadata_table$od)
@@ -296,39 +323,11 @@ normalize_by_od <- function(feature_table, metadata_table, samples_group_to_excl
   print(od_values)
   print(nrow(filtered_df) == length(od_values))
   
-  if (select_by == "all") {
-    #print("Select by all runing")
-    df_normalized <- filtered_df / od_values # to divide based on names list or indices
-    #return(select(df_normalized, c(2:length(df_normalized))))
-    df_normalized <- rbind(df_normalized, feature_table[metadata_table$syncom %in% samples_group_to_exclude, ])
-    return(df_normalized)
-  }
-  # else if (select_by == "range") {
-  #   #print(c((select_info[1]+1):(select_info[2]+1)))
-  #   #test_df <- select(dataframe, c((select_info[1]+1):(select_info[2])))
-  #   #print(select(dataframe, c((select_info[1]+1):(select_info[2]+1))))
-  #   df_normalized <- feature_table %>%
-  #     mutate(across(all_of(c((select_info[1]+1):(select_info[2]))), ~ . / od)) # to divide based on names list or indices
-  #     #mutate(across(starts_with("var"), ~ . / div_value)) %>% # to divide variables by pattern in name
-  #     #select(-div_value)  # Remove the division value column if not needed
-  #     # Return the normalized dataframe
-  #   return(select(df_normalized, c(2:length(df_normalized))))
-  # }
-  # else if (select_by == "numeric") {
-  #   df_normalized <- feature_table %>%
-  #     mutate(across(where(is.numeric), ~ . / div_value)) %>% # to divide all numeric variables
-  #     # Return the normalized dataframe
-  #     return(df_normalized)
-  # }
-  # else if (select_by == "pattern") {
-  #   df_normalized <- feature_table %>%
-  #     mutate(across(starts_with(select_info), ~ . / div_value)) %>% # to divide variables by pattern in name e.g. "var"
-  #     # Return the normalized dataframe
-  #     return(df_normalized)
-  # }
-  else{
-    print("select_by value not valid")
-  }
+  #print("Select by all runing")
+  df_normalized <- filtered_df / od_values # to divide based on names list or indices
+  #return(select(df_normalized, c(2:length(df_normalized))))
+  df_normalized <- rbind(df_normalized, feature_table[row.names(metadata_table) %in% samples_exclude, ])
+  return(df_normalized)
 }
 
 #######################
@@ -342,13 +341,16 @@ log2_convert <- function(metabolites_table){
 }
 
 #######################
-normalize_table_to_treatment <- function(metabolites_table, metadata_table, samples_norm){
+normalize_table_to_treatment <- function(feature_table, metadata_table, grouping_variable = NULL, samples_group_to_norm = NULL){
   #metabolites_table_norm <- metabolites_table %>% dplyr::select(-Metabolite) %>% t()
   ###metabolites_table_norm <- metabolites_table %>% dplyr::select(-Metabolite)
-  metabolites_table_norm <- metabolites_table
+  feature_table_norm <- as.data.frame(feature_table)
   
+  
+  samples_norm <- rownames(feature_table)[metadata_table[[grouping_variable]] %in% samples_group_to_norm]
+  print(samples_norm)
   # Get the means of the treatment used to normalize the rest of treatments
-  norm_treatment_means <- colMeans(metabolites_table[metadata_table$syncom %in% samples_norm, ])
+  norm_treatment_means <- colMeans(feature_table[metadata_table[[grouping_variable]] %in% samples_group_to_norm, ])
   ###norm_treatment_means <- rowMeans(dplyr::select(metabolites_table, samples_norm))
   print(norm_treatment_means)
   # Get the sds of the treatment used to normalize the rest of treatments
@@ -357,19 +359,19 @@ normalize_table_to_treatment <- function(metabolites_table, metadata_table, samp
   #norm_treatment_stds <- apply(metabolites_table[metadata_table$syncom %in% samples_norm, ], MARGIN = 2, FUN = sd)
   #print(norm_treatment_stds)
   
-  for (metabolite in 1:ncol(metabolites_table)) {
+  for (feature in 1:ncol(feature_table)) {
     #print(metabolite)
-    for (cSample in 1:nrow(metabolites_table)) {
+    for (cSample in 1:nrow(feature_table)) {
       #print(metabolites_table_norm[metabolite, cSample]*1000)
       #metabolites_table_norm[metabolite, cSample] <- (metabolites_table_norm[metabolite, cSample]-norm_treatment_means[metabolite])/norm_treatment_stds[metabolite]
-      metabolites_table_norm[cSample, metabolite] <- (metabolites_table_norm[cSample, metabolite]-norm_treatment_means[metabolite])
+      feature_table_norm[cSample, feature] <- (feature_table_norm[cSample, feature]-norm_treatment_means[feature])
     }
   }
   
   #print(head(metabolites_table_norm))
   #rownames(metabolites_table_norm) <- metabolites_table$Metabolite
   ###metabolites_table_norm <- tibble::add_column(metabolites_table_norm, "Metabolite" = metabolites_table$Metabolite, .before = 1)
-  return(as.data.frame(metabolites_table_norm))
+  return(as.data.frame(feature_table_norm))
 }
 
 #######################
@@ -396,8 +398,26 @@ graph_metabolites <- function(feature_table, y1 = -10, y2= 10, dotsize = 0.5, bi
 }
 
 
-
-
+scale_0_1 <- function(df, scale_by = "variable") {
+  if (!scale_by %in% c("variable", "sample")) {
+    stop("scale_by must be either 'variable' or 'sample'")
+  }
+  
+  # Scale by columns (variables)
+  if (scale_by == "variable") {
+    df_scaled <- as.data.frame(apply(df, 2, function(x) (x - min(x)) / (max(x) - min(x))))
+  } 
+  # Scale by rows (samples)
+  else if (scale_by == "sample") {
+    df_scaled <- as.data.frame(t(apply(df, 1, function(x) (x - min(x)) / (max(x) - min(x)))))
+  }
+  
+  # Preserve row and column names
+  rownames(df_scaled) <- rownames(df)
+  colnames(df_scaled) <- colnames(df)
+  
+  return(df_scaled)
+}
 
 ###################################################################################################
 

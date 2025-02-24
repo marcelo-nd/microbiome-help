@@ -115,6 +115,7 @@ barplot_from_feature_table <- function(feature_table,
   print(head(feature_table2))
   
   if (is.null(colour_palette)) {
+    print("Colour pallette generated")
     colour_palette <- get_palette(nColors = nrow(feature_table))
   }
   
@@ -126,7 +127,7 @@ barplot_from_feature_table <- function(feature_table,
                    axis.title.x = ggplot2::element_text(size=x_axis_title_size),
                    axis.text.x = ggplot2::element_text(angle = 90, vjust = 0.5, hjust=1, size = x_axis_text_size),
                    axis.title.y = ggplot2::element_text(size=y_axis_title_size),
-                   axis.text.y = ggplot2::element_text(size = x_axis_text_size),
+                   axis.text.y = ggplot2::element_text(size = y_axis_text_size),
                    legend.position=legend_pos,
                    legend.title=ggplot2::element_text(size=legend_title_size),
                    legend.text=ggplot2::element_text(size=legend_text_size),
