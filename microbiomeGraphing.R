@@ -141,7 +141,7 @@ barplot_from_feature_tables <- function(feature_tables, experiments_names, share
                                         plot_title = "", plot_title_size = 14,
                                         x_axis_text_size = 12, x_axis_title_size = 12,
                                         y_axis_title_size = 12, y_axis_text_size = 12,
-                                        legend_pos = "right", legend_title_size = 12, legend_text_size = 12, legend_cols = 3,
+                                        legend_pos = "right", legend_title_size = 12, legend_text_size = 12, legend_cols = 3, legend_key_size = 1, 
                                         colour_palette = NULL){
   # CreateS a barplot with panels from several otu tables. This otu tables can correspond to different experiments, runs or treatments.
   # Use "shared_samples = FALSE" to treat each otu table as different experiments.Then, each sample in a table is treated as a replicate.
@@ -272,10 +272,11 @@ barplot_from_feature_tables <- function(feature_tables, experiments_names, share
                      axis.text.y = ggplot2::element_text(size = x_axis_text_size),
                      legend.title=ggplot2::element_text(size=legend_title_size),
                      legend.text=ggplot2::element_text(size=legend_text_size),
-                     legend.position=legend_pos) +
+                     legend.position=legend_pos, legend.key.size = unit(legend_key_size, "cm")) +
       ggplot2::scale_fill_manual(values=colour_palette) + # Get color palette
       facet_grid(~experiment, scales = "free", space = "free") + # this is to remove empty factors due to samples being named differently
-      guides(fill = guide_legend(ncol = legend_cols))
+      guides(fill = guide_legend(ncol = legend_cols))+
+      guides(fill = guide_legend(override.aes = list(size=1)))
     otu_barplot
     return(otu_barplot)
   }
@@ -373,6 +374,45 @@ barplot_from_feature_table_sorted <- function(feature_table, sort_type = NULL, s
   return(otu_barplot)
 }
 
+barplot_with_replicates <- function(feature_table){
+  print(head(feature_table))
+  #df_rel <- feature_table
+  df_rel <- calculate_relative_abundance(feature_table)
+  
+  df_rel <- rownames_to_column(df_rel, var = "Species")
+  
+  ##### Calculate cumulative half addition
+  df_hcs <- cumulative_half_addition(df_rel)
+  
+  ### Now lets put together replicate data
+  ### Calculate the means of each sample
+  df_means_rel <- df_rel %>%
+    # Pivot to long format for easier manipulation
+    pivot_longer(cols = -Species, names_to = "Sample", values_to = "Abundance") %>%
+    # Extract sample IDs without replicate information
+    mutate(Sample_ID = sub("_R[0-9]+$", "", Sample)) %>%
+    # Group by species and sample to calculate mean abundance
+    group_by(Species, Sample_ID) %>%
+    summarize(Mean_Abundance = mean(Abundance), .groups = "drop")%>%        # Extract replicate number
+    filter(Mean_Abundance != 0)
+  
+  df_long_dots <- df_hcs %>%
+    pivot_longer(cols = -Species, names_to = "Sample", values_to = "Abundance") %>%
+    mutate(
+      Sample_ID = sub("_R[0-9]+$", "", Sample),  # Extract sample name without replicate info
+      Replicate = sub(".*_R", "", Sample)) %>%        # Extract replicate number
+    filter(Abundance != 0)
+  
+  (plot2 <- ggplot(NULL) + 
+      ggplot2::geom_bar(data = df_means_rel, aes(x=Sample_ID, y=Mean_Abundance, fill=Species, color = Species), position="fill", stat="identity", show.legend = TRUE) +
+      geom_point(data = df_long_dots, aes(x=Sample_ID, y=Abundance, shape = Species), size = 3, color = "white", stroke = 1.3) +
+      scale_shape_manual(values = c(0, 1, 17, 3, 4, 5, 6, 20, 8, 9, 10)) +
+      ggthemes::theme_tufte()
+  )
+  
+  return(plot2)
+}
+
 cumulative_half_addition <- function(df) {
   # Get numeric part of the dataframe (excluding species names)
   abundance_matrix <- as.matrix(df[, -1])
@@ -406,57 +446,16 @@ cumulative_half_addition <- function(df) {
 }
 
 calculate_relative_abundance <- function(df) {
-  # Ensure the first column is species names
-  species <- df[, 1]
-  
-  # Extract the numeric sample data
-  sample_data <- df[, -1]
-  
+  species <- rownames(df)
   # Calculate relative abundance
-  relative_abundance <- sweep(sample_data, 2, colSums(sample_data), "/")
-  
+  relative_abundance <- sweep(df, 2, colSums(df), "/")
   # Combine species names back with the relative abundance data
-  result <- cbind(Species = species, relative_abundance)
-  
+  rownames(relative_abundance) <- species
   # Return the result as a dataframe
-  return(as.data.frame(result))
+  return(as.data.frame(relative_abundance))
 }
 
-barplot_with_replicates <- function(feature_table){
-  print(head(feature_table))
-  df_rel <- feature_table
-  df_rel <- rownames_to_column(df_rel, var = "Species")
+barplot_w_strain_data <- function(otu_table, strain_data){
   
-  df_rel <- calculate_relative_abundance(df_rel)
-  
-  ##### Calculate cumulative half addition
-  df_hcs <- cumulative_half_addition(df_rel)
-  
-  ### Now lets put together replicate data
-  ### Calculate the means of each sample
-  df_means_rel <- df_rel %>%
-    # Pivot to long format for easier manipulation
-    pivot_longer(cols = -Species, names_to = "Sample", values_to = "Abundance") %>%
-    # Extract sample IDs without replicate information
-    mutate(Sample_ID = sub("_R[0-9]+$", "", Sample)) %>%
-    # Group by species and sample to calculate mean abundance
-    group_by(Species, Sample_ID) %>%
-    summarize(Mean_Abundance = mean(Abundance), .groups = "drop")%>%        # Extract replicate number
-    filter(Mean_Abundance != 0)
-  
-  df_long_dots <- df_hcs %>%
-    pivot_longer(cols = -Species, names_to = "Sample", values_to = "Abundance") %>%
-    mutate(
-      Sample_ID = sub("_R[0-9]+$", "", Sample),  # Extract sample name without replicate info
-      Replicate = sub(".*_R", "", Sample)) %>%        # Extract replicate number
-    filter(Abundance != 0)
-  
-  (plot2 <- ggplot(NULL) + 
-      ggplot2::geom_bar(data = df_means_rel, aes(x=Sample_ID, y=Mean_Abundance, fill=Species, color = Species), position="fill", stat="identity", show.legend = TRUE) +
-      geom_point(data = df_long_dots, aes(x=Sample_ID, y=Abundance, shape = Species), size = 3, color = "white", stroke = 1.3) +
-      scale_shape_manual(values = c(0, 1, 17, 3, 4, 5, 6, 20, 8, 9, 10)) +
-      ggthemes::theme_tufte()
-  )
-  
-  return(plot2)
 }
+  

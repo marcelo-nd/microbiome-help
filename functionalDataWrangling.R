@@ -18,6 +18,8 @@ if (!"vegan" %in% installed.packages()) install.packages("vegan")
 if (!"stringr" %in% installed.packages()) install.packages("stringr")
 if (!"readxl" %in% installed.packages()) install.packages("readxl")
 
+if (!"corrplot" %in% installed.packages()) install.packages("corrplot")
+
 library("docstring")
 library("dplyr")
 library("ggplot2")
@@ -397,7 +399,6 @@ graph_metabolites <- function(feature_table, y1 = -10, y2= 10, dotsize = 0.5, bi
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=0.5))
 }
 
-
 scale_0_1 <- function(df, scale_by = "variable") {
   if (!scale_by %in% c("variable", "sample")) {
     stop("scale_by must be either 'variable' or 'sample'")
@@ -543,7 +544,57 @@ stability_per_period <- function(replicate_data, period_length, time_unit = "day
   return(results_df)
 }
 
+feature_table_heatmap <- function(ft1, ft2){
+  ft1_t <- t(ft1)
+  ft1_t <- ft1_t[order(row.names(ft1_t)), ] # Ordering by row names
+  
+  
+  ft2_t <- t(ft2)
+  ft2_t <- ft2_t[order(row.names(ft2_t)), ] # Ordering by row names
+  
+  
+  ft1Xft2 <- cor(ft1_t, ft2_t, method = "pearson")
+  #heatmap(ft1Xft2)
+  corrplot::corrplot(ft1Xft2, , tl.cex=0.5)
+}
 
 
-
-
+feature_table_heatmap_w_sig <- function(ft1, ft2){
+  ft1_t <- t(ft1)
+  ft1_t <- ft1_t[order(row.names(ft1_t)), ] # Ordering by row names
+  
+  
+  ft2_t <- t(ft2)
+  ft2_t <- ft2_t[order(row.names(ft2_t)), ] # Ordering by row names
+  
+  
+  ft1Xft2 <- cor(ft1_t, ft2_t, method = "pearson")
+  
+  ft1Xft2_df <- as.data.frame(ft1Xft2)
+  
+  ft1Xft2_df <- cbind(rownames(ft1Xft2_df), data.frame(ft1Xft2_df, row.names=NULL))
+  colnames(ft1Xft2_df)[1] <- "species"
+  
+  #print(head(ft1Xft2_df))
+  
+  # Gathering data by species
+  adXm_g <- gather(ft1Xft2_df, starts_with('X'), key = "compound", value = "correlation")
+  
+  #print(head(adXm_g))
+  
+  adxm.pval <- as.data.frame(Hmisc::rcorr(ft1_t, ft2_t, type = "pearson")$P)
+  
+  print(adxm.pval)
+  # Converting rownames to column 1
+  adxm.pval <- cbind(rownames(adxm.pval), data.frame(adxm.pval, row.names=NULL))
+  colnames(adxm.pval)[1] <- "species"
+  # Gathering data by species
+  adXm_pvs_g <- gather(adxm.pval, starts_with('X'), key = "compound", value = "p_value")
+  # Create column of significance labels
+  adXm_pvs_g$stars <- cut(adXm_pvs_g$p_value, breaks=c(-Inf, 0.001, 0.01, 0.05, Inf), label=c("***", "**", "*", ""))
+  
+  # Adding stars column to original df
+  adXm_g["stars"] <- adXm_pvs_g$stars
+  
+  print(head(adXm_g))
+}

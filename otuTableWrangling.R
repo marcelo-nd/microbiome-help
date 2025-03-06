@@ -1,3 +1,14 @@
+# Sort otu table in barcodes numeration
+sort_nanopore_table_by_barcodes <- function(df, new_names = NULL){
+  cn <- colnames(df) # store column names
+  sorted_names <- cn[order(nchar(cn), cn)] # order columns names
+  df_sorted <- df[, sorted_names] # order data frame using colnames
+  if (!is.null(new_names) && ncol(df_sorted == length(new_names))) {
+    colnames(df_sorted) <- new_names
+  }
+  return(df_sorted)
+}
+
 ###################################################################################################
     
 filter_otus_by_counts_nas <- function(otu_table, min_count, percentage){
@@ -19,9 +30,6 @@ filter_otus_by_counts_col_counts <- function(otu_table, min_count, col_number){
     return(otu_table)
   }
 }
-
-# to do replace NAs with 0s
-# code on sequencing bar plots nasal syncom script
 
 sub_otutable <- function(otu_table, sample_indices, sample_names){
   # Select samples defined by user
@@ -69,3 +77,6 @@ rename_sample_names_prefix <- function(feature_tables, prefixes){
   }
   return(new_tables)
 }
+
+# to do replace NAs with 0s
+# code on sequencing bar plots nasal syncom script
