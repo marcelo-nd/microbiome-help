@@ -456,6 +456,9 @@ calculate_relative_abundance <- function(df) {
 }
 
 barplot_w_strain_data <- function(otu_table, strain_data){
+ # Does a simple barplot but also showing strain level belonging of identified OTUs
+  
+  
   
 }
   

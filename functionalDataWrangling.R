@@ -568,33 +568,53 @@ feature_table_heatmap_w_sig <- function(ft1, ft2){
   ft2_t <- ft2_t[order(row.names(ft2_t)), ] # Ordering by row names
   
   
-  ft1Xft2 <- cor(ft1_t, ft2_t, method = "pearson")
+  ft1Xft2 <- cor(ft1_t, ft2_t, method = "spearman")
   
   ft1Xft2_df <- as.data.frame(ft1Xft2)
   
   ft1Xft2_df <- cbind(rownames(ft1Xft2_df), data.frame(ft1Xft2_df, row.names=NULL))
   colnames(ft1Xft2_df)[1] <- "species"
   
-  #print(head(ft1Xft2_df))
-  
   # Gathering data by species
-  adXm_g <- gather(ft1Xft2_df, starts_with('X'), key = "compound", value = "correlation")
+  adXm_g <- ft1Xft2_df %>%
+    pivot_longer(cols = where(is.numeric), names_to = "compound", values_to = "correlation")
   
-  #print(head(adXm_g))
+  #print(adXm_g)
   
-  adxm.pval <- as.data.frame(Hmisc::rcorr(ft1_t, ft2_t, type = "pearson")$P)
+  adxm.pval <- as.data.frame(Hmisc::rcorr(ft1_t, ft2_t, type = "spearman")$P)
   
-  print(adxm.pval)
-  # Converting rownames to column 1
-  adxm.pval <- cbind(rownames(adxm.pval), data.frame(adxm.pval, row.names=NULL))
+  if (identical(ft1, ft2)) {
+    adxm.pval <- adxm.pval[1:(nrow(adxm.pval)/2), 1:(ncol(adxm.pval)/2)]
+    # Converting rownames to column 1
+    adxm.pval <- cbind(rownames(ft1), data.frame(adxm.pval, row.names=NULL))
+  }else{
+    adxm.pval <- adxm.pval[1:(nrow(ft1)), (nrow(ft1)+1):ncol(adxm.pval)]
+    # Converting rownames to column 1
+    adxm.pval <- cbind(rownames(adxm.pval), data.frame(adxm.pval, row.names=NULL))
+  }
   colnames(adxm.pval)[1] <- "species"
+
   # Gathering data by species
-  adXm_pvs_g <- gather(adxm.pval, starts_with('X'), key = "compound", value = "p_value")
+  adXm_pvs_g <- adxm.pval %>%
+    pivot_longer(cols = where(is.numeric), names_to = "compound", values_to = "p_value")
+  
+  # store pvalues
+  pvals <- adXm_pvs_g$p_value
+  
+  # Remove NAs
+  pvals[is.na(pvals)] <- 1
+  
   # Create column of significance labels
-  adXm_pvs_g$stars <- cut(adXm_pvs_g$p_value, breaks=c(-Inf, 0.001, 0.01, 0.05, Inf), label=c("***", "**", "*", ""))
+  adXm_g["pvals"] <- pvals
   
-  # Adding stars column to original df
-  adXm_g["stars"] <- adXm_pvs_g$stars
+  # Create column of significance labels
+  adXm_g["stars"] <- cut(pvals, breaks=c(-Inf, 0.001, 0.01, 0.05, Inf), label=c("***", "**", "*", ""))
   
-  print(head(adXm_g))
+  # Plotting
+  ggplot(aes(x=compound, y=species, fill=correlation), data=adXm_g) +
+    geom_tile() +
+    scale_fill_gradient2(low="#D7191C", mid="white", high="#2C7BB6") +
+    geom_text(aes(label=stars), color="black", size=2) +
+    theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust=1))
+  
 }
