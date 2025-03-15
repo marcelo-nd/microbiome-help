@@ -376,6 +376,22 @@ normalize_table_to_treatment <- function(feature_table, metadata_table, grouping
   return(as.data.frame(feature_table_norm))
 }
 
+log2_fold <- function(feature_table, metadata_table, grouping_variable = NULL, samples_group_to_norm = NULL){
+  # Convert table to log2.
+  feature_table_norm <- log2_convert(feature_table)
+  
+  # Get the means of the treatment used to normalize the rest of treatments
+  norm_treatment_means <- colMeans(feature_table_norm[metadata_table[[grouping_variable]] %in% samples_group_to_norm, ])
+  
+  # For each metabolite, subtract the log of each value for all samples from the log mean of the values for the normalization-treatment.
+  for (feature in 1:ncol(feature_table)) {
+    for (cSample in 1:nrow(feature_table)) {
+      feature_table_norm[cSample, feature] <- (feature_table_norm[cSample, feature]-norm_treatment_means[feature])
+    }
+  }
+  return(as.data.frame(feature_table_norm))
+}
+
 #######################
 graph_metabolites <- function(feature_table, y1 = -10, y2= 10, dotsize = 0.5, binwidth = 0.5, ylab = "Log fold change"){
   # Data shape
@@ -557,7 +573,6 @@ feature_table_heatmap <- function(ft1, ft2){
   #heatmap(ft1Xft2)
   corrplot::corrplot(ft1Xft2, , tl.cex=0.5)
 }
-
 
 feature_table_heatmap_w_sig <- function(ft1, ft2){
   ft1_t <- t(ft1)

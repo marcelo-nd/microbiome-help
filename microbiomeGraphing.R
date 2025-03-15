@@ -13,6 +13,8 @@ library(dplyr)
 library(tidyr)
 library(tibble)
 
+source("C:/Users/marce/Documents/GitHub/microbiome-help/otuTableWrangling.R")
+
 get_palette <- function(nColors = 60){
   colors_vec <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442","#0072B2",
     "brown1", "#CC79A7", "olivedrab3", "rosybrown", "darkorange3",
@@ -33,51 +35,6 @@ get_palette <- function(nColors = 60){
   #set.seed(1)
 
   return(colors_vec[sample(1:length(colors_vec), size = nColors)])
-}
-
-filter_species_by_col_counts <- function(otu_table, min_count, col_number) {
-  if (ncol(otu_table) == 1) { # 1 column for species and 1 for data
-    # Filter rows directly for the single sample column
-    filtered_df <- otu_table[otu_table[1] >= min_count, ,drop = FALSE]
-  } else {
-    # Check rows that meet the criteria: at least `m` columns with values >= `n
-    filtered_df <- otu_table[rowSums(otu_table >= min_count) >= col_number, ,drop = FALSE]
-  }
-  return(filtered_df)
-}
-
-transform_feature_table <- function(feature_table, transform_method){
-  if (transform_method == "zscale") {
-    # Z-Scaling
-    df_transformed <- as.data.frame(scale(feature_table))
-  } else if (transform_method == "min_max"){
-    df_transformed <- feature_table
-    normalize = function(x) (x- min(x))/(max(x) - min(x))
-    cols <- sapply(df_transformed, is.numeric)
-    df_transformed[cols] <- lapply(df_transformed[cols], normalize)
-  }else if (transform_method == "rel_abundance"){
-    # Relative abundance
-    df_transformed <- sweep(feature_table, 2, colSums(feature_table), FUN = "/")
-  } else{
-    "Transform method not valid"
-  }
-  return(df_transformed)
-}
-
-order_samples_by_clustering <- function(feature_table){
-  # Input feature_table and return the list of samples ordered according to the clustering algorithm
-  df_otu <- feature_table %>% rownames_to_column(var = "Species")
-  
-  df_t <- as.matrix(t(df_otu[, -1]))  # Exclude the "Species" column after moving it to row names
-  
-  # Perform hierarchical clustering
-  d <- dist(df_t, method = "euclidean")
-  hc <- hclust(d, method = "ward.D2")
-  
-  # Get the order of samples based on clustering
-  ordered_samples_cluster <- colnames(df_otu)[-1][hc$order]  # Remove "Species" again
-  
-  return(ordered_samples_cluster)
 }
 
 # to do order alphabetically or by overall abundance.
@@ -413,52 +370,106 @@ barplot_with_replicates <- function(feature_table){
   return(plot2)
 }
 
-cumulative_half_addition <- function(df) {
-  # Get numeric part of the dataframe (excluding species names)
-  abundance_matrix <- as.matrix(df[, -1])
+barplot_w_strain_data <- function(otu_table, strain_data){
+  #library(ggpattern)
+ # Does a barplot but also showing strain level belonging of identified OTUs
+  # Minmax transform
+  ot_scree_filtered_norm <- transform_feature_table(otu_table, transform_method = "min_max") # is this necessary?
+  # Get clustering order
+  ordered_samples_cluster <- order_samples_by_clustering(ot_scree_filtered_norm)
   
-  df2 <- as.matrix(df[, -1])
+  # Generate df long format for Species abundance data
+  ot_scree_filtered2 <- ot_scree_filtered %>% rownames_to_column(var = "Species")
+  df_otu_long <- ot_scree_filtered2 %>%
+    pivot_longer(-Species, names_to = "Sample", values_to = "Abundance")
   
-  # Apply calculations for each column (sample)
-  for (col in 1:ncol(abundance_matrix)) {
-    for (row in nrow(abundance_matrix):1) { # Iterate from bottom to top
-      if (row == nrow(abundance_matrix)) {
-        # Last row: itself divided by 2
-        if (df2[row, col] == 0) {
-          abundance_matrix[row, col] <- 0
-        } else{
-          abundance_matrix[row, col] <- df2[row, col] / 2
-        }
-      } else { # Other rows: cumulative sum of rows below + itself/2
-        if (df2[row, col] == 0) {
-          abundance_matrix[row, col] <- 0
-        } else {
-          abundance_matrix[row, col] <- sum(df2[(row + 1):nrow(df2), col]) +
-            (df2[row, col] / 2)
-        }
-      }
-    }
+  # Update sample factor levels in the long-format data for ggplot
+  df_otu_long$Sample <- factor(df_otu_long$Sample, levels = ordered_samples_cluster)
+  
+  ##### Now lets work with the strain data
+  
+  strain_data2 <- strain_data %>%
+    mutate(Strain_Number = rep(1:3, times = 10)) # 1, 2, 3 for each species
+  # TODO: make a flexible approach for varying strain number.
+  
+  # Replace `1`s with the strain number for each sample, keeping `0`s unchanged
+  for (sample_col in colnames(strain_data2[4:ncol(strain_data2)-1])) {
+    strain_data2[[sample_col]] <- ifelse(strain_data2[[sample_col]] == 1, strain_data2$Strain_Number, 0)
   }
   
-  # Replace values back into the dataframe
-  df[, -1] <- abundance_matrix
-  return(df)
-}
-
-calculate_relative_abundance <- function(df) {
-  species <- rownames(df)
-  # Calculate relative abundance
-  relative_abundance <- sweep(df, 2, colSums(df), "/")
-  # Combine species names back with the relative abundance data
-  rownames(relative_abundance) <- species
-  # Return the result as a dataframe
-  return(as.data.frame(relative_abundance))
-}
-
-barplot_w_strain_data <- function(otu_table, strain_data){
- # Does a simple barplot but also showing strain level belonging of identified OTUs
+  # Drop the helper "Strain_Number" column to get the desired output
+  df_final <- strain_data2 %>% select(-Strain_Number)
+  
+  # Collapse the information by species
+  df_collapsed <- df_final %>%
+    mutate(Species = sapply(strsplit(Species, " "), function(x) paste(x[1:2], collapse = " "))) %>% # Extract species name
+    group_by(Species) %>%
+    summarise(across(starts_with("SC"), max)) %>% # Take max per sample to represent strain
+    ungroup()
+  
+  # This should not be necessary
+  new_row <- c("Staphylococcus aureus", rep(1, ncol(df_collapsed) - 1))
+  new_row_df <- as.data.frame(t(new_row), stringsAsFactors = FALSE)
+  colnames(new_row_df) <- colnames(df_collapsed)
+  #
+  
+  df_collapsed2 <- rbind(df_collapsed, new_row_df)
+  
+  ##### Generate table for 
+  df_otu_long2 <- df_collapsed2 %>% # this might be df_strain_long
+    pivot_longer(-Species, names_to = "Sample", values_to = "Strain")
+  
+  ### Join the two long dataframes
+  
+  df_joined <- dplyr::full_join(df_otu_long, df_otu_long2, by = c("Species", "Sample"))
+  
+  df_joined_filtered <- df_joined %>%
+    filter(!is.na(Abundance) & Abundance != 0)
+  
+  df_joined_filtered <- df_joined_filtered %>%
+    filter(!is.na(Strain) & Strain != 0)
+  
+  df_joined_filtered <- df_joined_filtered %>%
+    mutate(Strain = factor(
+      case_when(
+        Strain == 1 ~ "Strain 1",
+        Strain == 2 ~ "Strain 2",
+        Strain == 3 ~ "Strain 3"
+      )
+    ))
+  
+  # Update sample factor levels in the long-format data for ggplot
+  df_joined_filtered$Sample <- factor(df_joined_filtered$Sample, levels = ordered_samples_cluster)
+  
+  ####### Now plotting
+  
+  colours_vec <- c("gold3", "#053f73", "blueviolet", "#CC79A7","#6279B8",
+                   "lightblue1","brown1", "olivedrab3", "darkorange3", "#23001E","hotpink" )
   
   
+  # this is the one, do not touch
+  p1 <- ggplot(data = df_joined_filtered, aes(x = Sample, y=Abundance)) +
+    ggpattern::geom_bar_pattern(aes(fill = Species, pattern = Strain, pattern_density = Strain),
+                     position = "fill",
+                     stat="identity",
+                     show.legend = TRUE,
+                     pattern_color = "white",
+                     pattern_fill = "white",
+                     pattern_angle = 45,
+                     pattern_spacing = 0.025) +
+    ggplot2::scale_fill_manual(values=colours_vec) +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 90, vjust = 0.5, hjust=1, size=12),
+                   axis.text.y = ggplot2::element_text(size=12),
+                   legend.text = element_text(size=12)) +
+    guides(pattern = guide_legend(override.aes = list(fill = "black")),
+           fill = guide_legend(override.aes = list(pattern = "none"))) +
+    scale_pattern_manual(values = c("Strain 1" = "none", "Strain 2" = "circle", "Strain 3" = "stripe")) +
+    scale_pattern_density_manual(values = c(0, 0.2, 0.05))
   
+  #return(df_collapsed)
+  #return(df_otu_long)
+  #return(df_otu_long2)
+  #return(df_joined_filtered)
+  return(p1)
 }
   
