@@ -467,9 +467,89 @@ barplot_w_strain_data <- function(otu_table, strain_data){
     scale_pattern_density_manual(values = c(0, 0.2, 0.05))
   
   #return(df_collapsed)
+  #return(df_collapsed2)
   #return(df_otu_long)
   #return(df_otu_long2)
-  #return(df_joined_filtered)
+  return(df_joined_filtered)
+  #return(p1)
+}
+
+strain_name2strain_number <- function(df){
+  # Extract only the "Genus species" part
+  species_names <- sub(" \\S+$", "", rownames(df))  
+  
+  # Create a numeric ID for each strain within the same species
+  species_ids <- ave(species_names, species_names, FUN = function(x) seq_along(x))
+  
+  # Create new rownames with species + strain ID
+  new_rownames <- paste(species_names, species_ids)
+  
+  # Assign new rownames to the dataframe
+  rownames(df) <- new_rownames
+  
+  # Print the updated dataframe
+  print(df)
+}
+
+barplot_w_strain_data2 <- function(feature_table, strain_data){
+  #library(ggpattern)
+  # Does a barplot but also showing strain level belonging of identified OTUs
+  strain_numers_ft <- strain_name2strain_number(feature_table)
+  
+  # Assuming your dataframe is named df
+  df_long <- strain_numers_ft %>%
+    rownames_to_column(var = "Species") %>%  # Convert row names to a column
+    pivot_longer(
+      cols = -Species,  # All columns except "Species" will be pivoted
+      names_to = "Sample",
+      values_to = "Abundance"
+    ) %>%
+    mutate(
+      Strain = paste0("Strain ", sub(".* ", "", Species)),  # Extract last number as strain
+      Species = sub(" \\d+$", "", Species)  # Remove strain number from species name
+    )
+  
+  df_long_filtered <- df_long %>%
+    filter(!is.na(Abundance) & Abundance != 0)
+  
+  df_long_filtered <- df_long_filtered %>%
+    filter(!is.na(Strain) & Strain != 0)
+  
+  if (TRUE) {
+    # Minmax transform
+    ft_std <- transform_feature_table(feature_table, transform_method = "min_max") # is this necessary?
+    # Get clustering order
+    ordered_samples_cluster <- order_samples_by_clustering(ft_std)
+    # Update sample factor levels in the long-format data for ggplot
+    df_long_filtered$Sample <- factor(df_long_filtered$Sample, levels = ordered_samples_cluster)
+  }
+  
+  colours_vec <- c("gold3", "#053f73", "blueviolet", "#CC79A7","#6279B8",
+                   "lightblue1","brown1", "olivedrab3", "darkorange3", "#23001E","hotpink" )
+  
+  
+  # this is the one, do not touch
+  p1 <- ggplot(data = df_long_filtered, aes(x = Sample, y=Abundance)) +
+    ggpattern::geom_bar_pattern(aes(fill = Species, pattern = Strain, pattern_density = Strain),
+                                position = "fill",
+                                stat="identity",
+                                show.legend = TRUE,
+                                pattern_color = "white",
+                                pattern_fill = "white",
+                                pattern_angle = 45,
+                                pattern_spacing = 0.025) +
+    ggplot2::scale_fill_manual(values=colours_vec) +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 90, vjust = 0.5, hjust=1, size=12),
+                   axis.text.y = ggplot2::element_text(size=12),
+                   legend.text = element_text(size=12)) +
+    guides(pattern = guide_legend(override.aes = list(fill = "black")),
+           fill = guide_legend(override.aes = list(pattern = "none"))) +
+    scale_pattern_manual(values = c("Strain 1" = "none", "Strain 2" = "circle", "Strain 3" = "stripe")) +
+    scale_pattern_density_manual(values = c(0, 0.2, 0.05))
+  
+  #return(strain_numers_ft)
+  #return(df_long)
+  #return(df_long_filtered)
+  #return(ordered_samples_cluster)
   return(p1)
 }
-  
