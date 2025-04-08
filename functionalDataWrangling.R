@@ -167,17 +167,21 @@ get_palette <- function(nColors = 50){
 }
 
 # Do PCA plot, prev. fia_pca
-ft_pca_1 <- function(feature_table, metadata_table, grouping_col, encircle = FALSE){
+ft_pca_1 <- function(feature_table, metadata_table, grouping_col, color_palette = NULL, encircle = FALSE){
   # transposing feature table
   ft_t <- t(feature_table)
-  if (isTRUE(all.equal(colnames(ft_t),row.names(metadata)))) {
+  if (isTRUE(all.equal(colnames(ft_t),row.names(metadata_table)))) {
     print("Sample names in feature table and metadatable are identical :)")
     
     fia_pca <- PCAtools::pca(ft_t, scale = TRUE, metadata = metadata_table, transposed = FALSE)
     
-    p2 <- PCAtools::biplot(fia_pca, showLoadings = TRUE, ntopLoadings = 2, lab = NULL, colby = grouping_col,
+    if (is.null(color_palette)) {
+      color_palette = get_palette(nColors = 60)
+    }
+    
+    p2 <- PCAtools::biplot(fia_pca, showLoadings = TRUE, ntopLoadings = 0, lab = NULL, colby = grouping_col,
                            legendPosition = "right", axisLabSize = 8, legendLabSize = 8, legendIconSize = 2, pointSize = 1.5,
-                           colkey = get_palette(nColors = 60), encircle = encircle)
+                           colkey = color_palette, encircle = encircle, colLegendTitle = "SynCom")
     
     p2
   }else{
@@ -419,7 +423,6 @@ scale_0_1 <- function(df, scale_by = "variable") {
   if (!scale_by %in% c("variable", "sample")) {
     stop("scale_by must be either 'variable' or 'sample'")
   }
-  
   # Scale by columns (variables)
   if (scale_by == "variable") {
     df_scaled <- as.data.frame(apply(df, 2, function(x) (x - min(x)) / (max(x) - min(x))))
@@ -632,4 +635,24 @@ feature_table_heatmap_w_sig <- function(ft1, ft2){
     geom_text(aes(label=stars), color="black", size=2) +
     theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust=1))
   
+}
+
+# fucntion for imputating a feature table
+
+ft_imputation <- function(ft){
+  # get the lowest intensity (that is not zero) as a cutoff LOD value
+  Cutoff_LOD <- round(min(ft[ft > 0]))
+  print(paste0("The limit of detection (LOD) is: ",Cutoff_LOD))
+  # Step 25: Random Value Generation & Zero Replacement
+  # Set the seed for random number generation
+  set.seed(141222) # by setting a seed, we generate the same set of random number all the time
+  
+  imp <- ft
+  
+  for (i in 1:ncol(imp)) {
+    imp[,i] <- ifelse(imp[,i] == 0, 
+                      round(runif(nrow(imp), min = 1, max = Cutoff_LOD), 1),
+                      imp[,i])
+  }
+  return(imp)
 }

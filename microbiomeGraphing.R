@@ -488,7 +488,8 @@ strain_name2strain_number <- function(df){
   rownames(df) <- new_rownames
   
   # Print the updated dataframe
-  print(df)
+  #print(df)
+  return(df)
 }
 
 barplot_w_strain_data2 <- function(feature_table, strain_data){
@@ -525,8 +526,7 @@ barplot_w_strain_data2 <- function(feature_table, strain_data){
   }
   
   colours_vec <- c("gold3", "#053f73", "blueviolet", "#CC79A7","#6279B8",
-                   "lightblue1","brown1", "olivedrab3", "darkorange3", "#23001E","hotpink" )
-  
+                   "lightblue1","brown1", "olivedrab3", "darkorange3", "#23001E","hotpink")
   
   # this is the one, do not touch
   p1 <- ggplot(data = df_long_filtered, aes(x = Sample, y=Abundance)) +
@@ -544,12 +544,113 @@ barplot_w_strain_data2 <- function(feature_table, strain_data){
                    legend.text = element_text(size=12)) +
     guides(pattern = guide_legend(override.aes = list(fill = "black")),
            fill = guide_legend(override.aes = list(pattern = "none"))) +
-    scale_pattern_manual(values = c("Strain 1" = "none", "Strain 2" = "circle", "Strain 3" = "stripe")) +
-    scale_pattern_density_manual(values = c(0, 0.2, 0.05))
+    ggpattern::scale_pattern_manual(values = c("Strain 1" = "none", "Strain 2" = "circle", "Strain 3" = "stripe")) +
+    ggpattern::scale_pattern_density_manual(values = c(0, 0.2, 0.05))
   
   #return(strain_numers_ft)
   #return(df_long)
   #return(df_long_filtered)
   #return(ordered_samples_cluster)
   return(p1)
+}
+
+
+
+
+barplot_from_feature_tables2 <- function(feature_tables, experiments_names, shared_samples = FALSE,
+                                        plot_title = "", plot_title_size = 14,
+                                        x_axis_text_size = 12, x_axis_title_size = 12,
+                                        y_axis_title_size = 12, y_axis_text_size = 12,
+                                        legend_pos = "right", legend_title_size = 12, legend_text_size = 12, legend_cols = 3, legend_key_size = 1, 
+                                        colour_palette = NULL){
+  # CreateS a barplot 
+  
+  # Step 1. Clean, join and gather the otu tables.
+  sample_names = c()
+  for (table in seq(from = 1, to = length(feature_tables), by=1)) {
+    
+    # copy feature table to avoid modifying the original table.
+    feature_table2 <- feature_tables[[table]]
+    
+    #print(head(feature_table2)) # check the working feature table
+    
+    # Convert table to strain-number table
+    feature_table2 <- strain_name2strain_number(feature_table2)
+    
+    # Remove rows with Zero counts
+    feature_table2 <- filter_species_by_col_counts(feature_table2, min_count = 1, col_number = 1)
+    
+    #print(head(feature_table2))
+    
+    # save names of species
+    species_names <- row.names(feature_table2)
+    
+    # Remove columns (samples) with zero count
+    if (ncol(feature_table2) > 1) {
+      feature_table2 <- feature_table2[, colSums(feature_table2 != 0) > 0]
+    }
+    
+    sample_names <- c(sample_names, colnames(feature_table2))
+    
+    #print(head(feature_table2))
+    
+    # Create a column with the names of ASVs/OTUs using rownames.
+    feature_table2["species"] <- species_names
+    #print(feature_table2$species)
+    
+    # Use dplyr gather the working feature table.
+    feature_table_g <- tidyr::gather(feature_table2, 1:(ncol(feature_table2) - 1) , key = "sample", value = "abundance")
+    
+    #print(experiments_names[table]) # check experiment name that corresponds to working feature table.
+    
+    # Create a column to keep track of from which experiment/treatment the samples come from.
+    feature_table_g$experiment <- experiments_names[table] # the experiment name is taken from experiments_names vector
+    
+    #print(head(feature_table_g))
+    
+    # rbind the gathered feature tables.
+    # Result is exp_plot_table, a table containing in each row species;sample;abundance;experiment data for all tables to make a barplot.
+    if (table == 1) {
+      exp_plot_table <- feature_table_g
+    }else{
+      exp_plot_table <- rbind(exp_plot_table, feature_table_g)
+    }
+  }
+  
+  print(sample_names)
+  print(head(exp_plot_table)) # check gathered table
+  
+  # I THINK THIS STEP IS WHERE A STRAIN COLUMN IS CREATED: CHECK:
+  df_long <- exp_plot_table %>%
+    mutate(
+      strain = paste0("Strain ", sub(".* ", "", species)),  # Extract last number as strain
+      species2 = sub(" \\d+$", "", species)  # Remove strain number from species name
+    )
+  
+  print(head(df_long))
+  
+  df_long_filtered <- df_long %>%
+    filter(!is.na(abundance) & abundance != 0)
+  
+  df_long_filtered <- df_long_filtered %>%
+    filter(!is.na(strain) & strain != 0)
+  
+  p1 <- ggplot(data = df_long_filtered, aes(x = sample, y=abundance)) +
+    ggpattern::geom_bar_pattern(aes(fill = species2, pattern = strain, pattern_density = strain),
+                                position = "fill",
+                                stat="identity",
+                                show.legend = TRUE,
+                                pattern_color = "white",
+                                pattern_fill = "white",
+                                pattern_angle = 45,
+                                pattern_spacing = 0.025) +
+    ggpattern::scale_pattern_manual(values = c("Strain 1" = "none", "Strain 2" = "circle", "Strain 3" = "stripe")) +
+    ggpattern::scale_pattern_density_manual(values = c(0, 0.2, 0.05)) +
+    facet_grid(~experiment, scales = "free", space = "free")
+  
+  
+  # Show plot
+  p1
+  #return(otu_barplot)
+  
 }

@@ -10,18 +10,14 @@ sort_nanopore_table_by_barcodes <- function(df, new_names = NULL){
 }
 
 ###################################################################################################
-    
+
 filter_otus_by_counts_nas <- function(otu_table, min_count, percentage){
     return(otu_table[which(rowMeans(! is.na(otu_table)) >= percentage), ])
 }
-    
-###################################################################################################
 
 filter_otus_by_counts_col_percent <- function(otu_table, min_count, percentage){
     return(otu_table[which(rowMeans(otu_table >= min_count) >= percentage), ])
 }
-    
-###################################################################################################
 
 filter_otus_by_counts_col_counts <- function(otu_table, min_count, col_number){
   if (ncol(otu_table) > 1) {
@@ -29,6 +25,17 @@ filter_otus_by_counts_col_counts <- function(otu_table, min_count, col_number){
   }else{
     return(otu_table)
   }
+}
+
+filter_species_by_col_counts <- function(otu_table, min_count, col_number) {
+  if (ncol(otu_table) == 1) { # 1 column for species and 1 for data
+    # Filter rows directly for the single sample column
+    filtered_df <- otu_table[otu_table[1] >= min_count, ,drop = FALSE]
+  } else {
+    # Check rows that meet the criteria: at least `m` columns with values >= `n
+    filtered_df <- otu_table[rowSums(otu_table >= min_count) >= col_number, ,drop = FALSE]
+  }
+  return(filtered_df)
 }
 
 sub_otutable <- function(otu_table, sample_indices, sample_names){
@@ -52,7 +59,6 @@ prep_otutable <- function(otu_table, rename_cols, set_row_names, col_pattern){
   otu_table <- as.data.frame(otu_table)
   if (rename_cols) {
     colnames(otu_table) <- paste(colnames(otu_table), col_pattern, sep = "_")
-    
   }
   if (set_row_names) {
     row.names(otu_table) <- otu_table[,1]
@@ -140,17 +146,6 @@ calculate_relative_abundance <- function(df) {
   rownames(relative_abundance) <- species
   # Return the result as a dataframe
   return(as.data.frame(relative_abundance))
-}
-
-filter_species_by_col_counts <- function(otu_table, min_count, col_number) {
-  if (ncol(otu_table) == 1) { # 1 column for species and 1 for data
-    # Filter rows directly for the single sample column
-    filtered_df <- otu_table[otu_table[1] >= min_count, ,drop = FALSE]
-  } else {
-    # Check rows that meet the criteria: at least `m` columns with values >= `n
-    filtered_df <- otu_table[rowSums(otu_table >= min_count) >= col_number, ,drop = FALSE]
-  }
-  return(filtered_df)
 }
 
 order_samples_by_clustering <- function(feature_table){
