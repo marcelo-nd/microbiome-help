@@ -1,4 +1,16 @@
 
+# Sort otu table in barcodes numeration
+sort_nanopore_table_by_barcodes <- function(df, new_names = NULL){
+  cn <- colnames(df) # store column names
+  sorted_names <- cn[order(nchar(cn), cn)] # order columns names
+  df_sorted <- df[, sorted_names] # order data frame using colnames
+  if (!is.null(new_names) && ncol(df_sorted == length(new_names))) {
+    colnames(df_sorted) <- new_names
+  }
+  return(df_sorted)
+}
+
+
 get_inoculated_strains <- function(df2, sample_name) {
   # Select the column corresponding to the sample
   sample_column <- df2[[sample_name]]
@@ -67,4 +79,15 @@ merge_abundance_by_strain <- function(df1, df2) {
     }
   }
   return(as.data.frame(new_abundance_matrix))
+}
+
+
+##### Table Filtering
+
+filter_otus_by_counts_col_counts <- function(otu_table, min_count, col_number){
+  if (ncol(otu_table) > 1) {
+    return(otu_table[which(rowSums(otu_table >= min_count) >= col_number), ])
+  }else{
+    return(otu_table)
+  }
 }

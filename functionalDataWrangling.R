@@ -53,6 +53,33 @@ read_fia_table <- function(table_path, sheet = "pos", fix_names = FALSE, sort_ta
   return(fia_df_t)
 }
 
+read_lcms_table <- function(table_path, sheet = "Ratios", fix_names = FALSE, sort_table = TRUE){
+  feature_table <- readxl::read_excel(path = table_path, sheet = sheet, col_names = TRUE)
+  # Retain only necessary columns
+  fia_df <- cbind(feature_table[, 1], feature_table[, 9:ncol(feature_table)])
+  # Transpose table
+  fia_df_t <- t(fia_df)
+  # Set column names as metabolites names
+  colnames(fia_df_t) <- fia_df_t[1,]
+  # Remove metnames column
+  fia_df_t <- fia_df_t[2:nrow(fia_df_t),]
+  # Reconvert to dataframe
+  fia_df_t <- as.data.frame(fia_df_t)
+  # Transform to numeric all columns
+  fia_df_t[,1:ncol(fia_df_t)] <- sapply(fia_df_t[,1:ncol(fia_df_t)],as.numeric)
+  # Check the data types of columns
+  #print(sapply(fia_df_t, class))
+  if (fix_names) {
+    colnames(fia_df_t) <- make.names(colnames(fia_df_t), unique=TRUE)
+  }
+  
+  if (isTRUE(sort_table)) {
+    fia_df_t <- fia_df_t[order(row.names(fia_df_t)), ] # sort my row names (sample names)
+  }
+  
+  return(fia_df_t)
+}
+
 read_ft_1 <- function(path, sort_by_names = FALSE){
   # Read Hitschickers guide style export feature table
   ft <- read.csv(path, header = TRUE, row.names = 1) #read csv table

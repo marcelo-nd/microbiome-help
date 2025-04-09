@@ -554,9 +554,6 @@ barplot_w_strain_data2 <- function(feature_table, strain_data){
   return(p1)
 }
 
-
-
-
 barplot_from_feature_tables2 <- function(feature_tables, experiments_names, shared_samples = FALSE,
                                         plot_title = "", plot_title_size = 14,
                                         x_axis_text_size = 12, x_axis_title_size = 12,
@@ -648,9 +645,157 @@ barplot_from_feature_tables2 <- function(feature_tables, experiments_names, shar
     ggpattern::scale_pattern_density_manual(values = c(0, 0.2, 0.05)) +
     facet_grid(~experiment, scales = "free", space = "free")
   
-  
   # Show plot
   p1
   #return(otu_barplot)
   
 }
+
+
+### Rework from grid barplot fucntion
+barplots_grid <- function(feature_tables, experiments_names, shared_samples = FALSE, strains = FALSE, plot_title = "",
+                          plot_title_size = 14, x_axis_text_size = 12, x_axis_title_size = 12,
+                          y_axis_title_size = 12, y_axis_text_size = 12,
+                          legend_pos = "right", legend_title_size = 12, legend_text_size = 12, legend_cols = 3, legend_key_size = 1, 
+                                         colour_palette = NULL){
+  # Creates a grid of Barplots
+  
+  ### Step 1. Clean, join and gather the otu tables.
+  sample_names = c() # to keep track of the sample names
+  for (table in seq(from = 1, to = length(feature_tables), by=1)) { # iterate over all the feature tables
+    # copy current feature table to avoid modifying the original table.
+    feature_table <- feature_tables[[table]]
+    
+    #print(head(feature_table2)) # check the working feature table
+    
+    if (isTRUE(strains)) {
+      # Convert table with strain names to a strain-number table
+      feature_table <- strain_name2strain_number(feature_table)
+    }
+
+    # Remove rows with Zero counts
+    feature_table <- filter_species_by_col_counts(feature_table, min_count = 1, col_number = 1)
+    
+    #print(head(feature_table2))
+    
+    # save names of species
+    species_names <- row.names(feature_table)
+    
+    # Remove columns (samples) with zero count
+    if (ncol(feature_table) > 1) {
+      feature_table <- feature_table[, colSums(feature_table != 0) > 0]
+    }
+    
+    sample_names <- c(sample_names, colnames(feature_table))
+    
+    #print(head(feature_table2))
+    
+    # Create a column with the names of ASVs/OTUs using rownames.
+    feature_table["species"] <- species_names
+    #print(feature_table2$species)
+    
+    # Use dplyr gather the working feature table.
+    feature_table_g <- tidyr::gather(feature_table, 1:(ncol(feature_table) - 1) , key = "sample", value = "abundance")
+    
+    #print(experiments_names[table]) # check experiment name that corresponds to working feature table.
+    
+    # Create a column to keep track of from which experiment/treatment the samples come from.
+    feature_table_g$experiment <- experiments_names[table] # the experiment name is taken from experiments_names vector
+    
+    #print(head(feature_table_g))
+    
+    # rbind the gathered feature tables.
+    # Result is exp_plot_table, a table containing in each row species;sample;abundance;experiment data for all tables to make a barplot.
+    if (table == 1) {
+      plot_df <- feature_table_g
+    }else{
+      plot_df <- rbind(plot_df, feature_table_g)
+    }
+  }
+  print(sample_names) # check sample_names
+  print(head(plot_df)) # check gathered table
+ 
+  ### Step 2. Convert Strain data to a graphing-compatible format.
+  # Add strain data column to long dataframe
+  if (isTRUE(strains)) {
+    plot_df <- plot_df %>%
+      mutate(
+        strain = paste0("Strain ", sub(".* ", "", species)),  # Extract last number as strain
+        species2 = sub(" \\d+$", "", species)  # Remove strain number from species name
+      )
+  }
+  
+  print(head(plot_df))
+  
+  ### Step 3. Clean the long-format table
+  plot_df_filtered <- plot_df %>%
+    filter(!is.na(abundance) & abundance != 0)
+  
+  if (isTRUE(strains)) {
+    plot_df_filtered <- plot_df_filtered %>%
+      filter(!is.na(strain) & strain != 0)
+  }
+  
+  plot_df_filtered$experiment <- factor(plot_df_filtered$experiment, levels = experiments_names)
+  
+  ### Step 4. Plotting
+  # get color palette
+  if (is.null(colour_palette)) {
+    colour_palette <- get_palette(nColors = length(unique(plot_df$species)))
+  }
+  
+  print(plot_df_filtered) # check final table prevouos to plotting
+  
+  # Create base plot.
+  if (shared_samples) {
+    p1 <- ggplot(data = plot_df_filtered, aes(x = experiment, y=abundance)) +
+      facet_grid(~sample)
+  } else{
+    p1 <- ggplot(data = plot_df_filtered, aes(x = sample, y=abundance)) +
+      facet_grid(~experiment, scales = "free", space = "free")
+  }
+
+  # Add elements based on graph type.
+  if (isTRUE(strains)) {
+    print("strains processing")
+    p1 <- p1 + ggpattern::geom_bar_pattern(aes(fill = species2, pattern = strain, pattern_density = strain),
+                                     position = "fill",
+                                     stat="identity",
+                                     show.legend = TRUE,
+                                     pattern_color = "white",
+                                     pattern_fill = "white",
+                                     pattern_angle = 45,
+                                     pattern_spacing = 0.025) +
+      ggpattern::scale_pattern_manual(values = c("Strain 1" = "none", "Strain 2" = "circle", "Strain 3" = "stripe")) +
+      ggpattern::scale_pattern_density_manual(values = c(0, 0.2, 0.1)) +
+      guides(pattern = guide_legend(override.aes = list(fill = "black")),
+             fill = guide_legend(override.aes = list(pattern = "none")))
+  } else{
+    print("no strains")
+    p1 <- p1 + geom_bar(aes(fill = species),
+             position = position_fill(),
+             stat = "identity")
+  }
+  
+  if (!is.null(colours_vec)) {
+    p1 <- p1 + ggplot2::scale_fill_manual(values=colour_palette)
+  } else{
+    print("Colours vec is null, using standard color palette.")
+  }
+  
+  p1 <- p1 +
+    ggplot2::theme(plot.title = ggplot2::element_text(size = plot_title_size, face = "bold", hjust = 0.5, vjust = 0.5),
+                   axis.title.x = ggplot2::element_text(size=x_axis_title_size),
+                   axis.text.x = ggplot2::element_text(angle = 90, vjust = 0.5, hjust=1, size = x_axis_text_size),
+                   axis.title.y = ggplot2::element_text(size=y_axis_title_size),
+                   axis.text.y = ggplot2::element_text(size = x_axis_text_size),
+                   legend.title=ggplot2::element_text(size=legend_title_size),
+                   legend.text=ggplot2::element_text(size=legend_text_size),
+                   legend.position=legend_pos, legend.key.size = unit(legend_key_size, "cm"))
+
+  # Show plot
+  p1
+  #return(otu_barplot)
+   
+}
+
