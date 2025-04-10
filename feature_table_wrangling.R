@@ -10,7 +10,26 @@ sort_nanopore_table_by_barcodes <- function(df, new_names = NULL){
   return(df_sorted)
 }
 
+#
+strain_name2strain_number <- function(df){
+  # Extract only the "Genus species" part
+  species_names <- sub(" \\S+$", "", rownames(df))  
+  
+  # Create a numeric ID for each strain within the same species
+  species_ids <- ave(species_names, species_names, FUN = function(x) seq_along(x))
+  
+  # Create new rownames with species + strain ID
+  new_rownames <- paste(species_names, species_ids)
+  
+  # Assign new rownames to the dataframe
+  rownames(df) <- new_rownames
+  
+  # Print the updated dataframe
+  #print(df)
+  return(df)
+}
 
+#
 get_inoculated_strains <- function(df2, sample_name) {
   # Select the column corresponding to the sample
   sample_column <- df2[[sample_name]]
@@ -82,8 +101,23 @@ merge_abundance_by_strain <- function(df1, df2) {
 }
 
 
-##### Table Filtering
+order_samples_by_clustering <- function(feature_table){
+  # Takes feature_table and returns the list of samples ordered according to the clustering algorithm
+  df_otu <- feature_table %>% rownames_to_column(var = "Species")
+  
+  df_t <- as.matrix(t(df_otu[, -1]))  # Exclude the "Species" column after moving it to row names
+  
+  # Perform hierarchical clustering
+  d <- dist(df_t, method = "euclidean")
+  hc <- hclust(d, method = "ward.D2")
+  
+  # Get the order of samples based on clustering
+  ordered_samples_cluster <- colnames(df_otu)[-1][hc$order]  # Remove "Species" again
+  
+  return(ordered_samples_cluster)
+}
 
+##### Table Filtering
 filter_otus_by_counts_col_counts <- function(otu_table, min_count, col_number){
   if (ncol(otu_table) > 1) {
     return(otu_table[which(rowSums(otu_table >= min_count) >= col_number), ])
@@ -91,3 +125,24 @@ filter_otus_by_counts_col_counts <- function(otu_table, min_count, col_number){
     return(otu_table)
   }
 }
+
+
+##### Table Transformation
+transform_feature_table <- function(feature_table, transform_method){
+  if (transform_method == "zscale") {
+    # Z-Scaling
+    df_transformed <- as.data.frame(scale(feature_table))
+  } else if (transform_method == "min_max"){
+    df_transformed <- feature_table
+    normalize = function(x) (x- min(x))/(max(x) - min(x))
+    cols <- sapply(df_transformed, is.numeric)
+    df_transformed[cols] <- lapply(df_transformed[cols], normalize)
+  }else if (transform_method == "rel_abundance"){
+    # Relative abundance
+    df_transformed <- sweep(feature_table, 2, colSums(feature_table), FUN = "/")
+  } else{
+    "Transform method not valid"
+  }
+  return(df_transformed)
+}
+
