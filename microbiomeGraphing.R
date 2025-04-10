@@ -8,10 +8,14 @@ if (!require("tidyr", quietly = TRUE))
 if (!require("dplyr", quietly = TRUE))
   install.packages("dplyr")
 
+if (!require("ggpattern", quietly = TRUE))
+  install.packages("ggpattern")
+
 library(ggplot2)
 library(dplyr)
 library(tidyr)
 library(tibble)
+library(ggpattern)
 
 source("C:/Users/marce/Documents/GitHub/microbiome-help/feature_table_wrangling.R")
 
@@ -36,7 +40,7 @@ get_palette <- function(nColors = 60){
 
   return(colors_vec[sample(1:length(colors_vec), size = nColors)])
 }
-
+# todo: strain level
 barplot_from_feature_table <- function(feature_table, sort_type = "None", feature_to_sort = NULL,
                                        plot_title = "", plot_title_size = 14,
                                        x_axis_text_size = 12, x_axis_title_size = 12,
@@ -279,6 +283,29 @@ barplots_grid <- function(feature_tables, experiments_names, shared_samples = FA
   return(p1)
 }
 
-
-
-
+dendogram_from_feature_table <- function(df){
+  # Prepare table
+  df_n <- transform_feature_table(df, transform_method = "min_max")
+  
+  df_n <- df_n %>% rownames_to_column(var = "Species")
+  
+  df_t <- as.matrix(t(df_n[, -1]))  # Exclude the "Species" column after moving it to row names
+  
+  #print(head(df_t))
+  
+  # Perform hierarchical clustering
+  d <- dist(df_t, method = "euclidean")
+  hc <- hclust(d, method = "ward.D2")
+  
+  dendo_plot <- ggdendro::ggdendrogram(hc, rotate = 0,
+                     leaf_labels = F) +
+    theme(plot.margin = margin(t = 40,  # Top margin
+                               r = 0,  # Right margin
+                               b = -25,  # Bottom margin
+                               l = 0)) + # Left margin
+    scale_y_continuous(expand = expansion(add = c(1, 1)), labels = NULL) + 
+    scale_x_continuous(expand = expansion(add = c(0.35, 0.5)), labels = NULL)
+  
+  dendo_plot
+  return(dendo_plot)
+}
