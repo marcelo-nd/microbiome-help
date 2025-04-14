@@ -71,7 +71,7 @@ merge_abundance_by_strain <- function(df1, df2) {
     #print(samples[i])
     # Get the SC to which it belongs to.
     current_sc <- strsplit(x = samples[i], split = "_")[[1]][1]
-    #print(current_sc)
+    print(current_sc)
     # get the list of strains inoculated in that sample.
     inoc_strains_per_sample <- get_inoculated_strains(df2 = df2, sample_name = current_sc)
     print(inoc_strains_per_sample)
@@ -100,7 +100,6 @@ merge_abundance_by_strain <- function(df1, df2) {
   return(as.data.frame(new_abundance_matrix))
 }
 
-
 order_samples_by_clustering <- function(feature_table){
   # Takes feature_table and returns the list of samples ordered according to the clustering algorithm
   df_otu <- feature_table %>% rownames_to_column(var = "Species")
@@ -126,7 +125,6 @@ filter_otus_by_counts_col_counts <- function(otu_table, min_count, col_number){
   }
 }
 
-
 ##### Table Transformation
 transform_feature_table <- function(feature_table, transform_method){
   if (transform_method == "zscale") {
@@ -145,4 +143,3 @@ transform_feature_table <- function(feature_table, transform_method){
   }
   return(df_transformed)
 }
-

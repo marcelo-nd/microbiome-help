@@ -40,8 +40,9 @@ get_palette <- function(nColors = 60){
 
   return(colors_vec[sample(1:length(colors_vec), size = nColors)])
 }
+
 # todo: strain level
-barplot_from_feature_table <- function(feature_table, sort_type = "None", feature_to_sort = NULL,
+barplot_from_feature_table <- function(feature_table, sort_type = "none", feature_to_sort = NULL, strains = FALSE,
                                        plot_title = "", plot_title_size = 14,
                                        x_axis_text_size = 12, x_axis_title_size = 12,
                                        y_axis_title_size = 12, y_axis_text_size = 12,
@@ -49,16 +50,23 @@ barplot_from_feature_table <- function(feature_table, sort_type = "None", featur
                                        colour_palette = NULL){
   ### Step 1. Clean feature table
   # Remove empty rows (features)
-  #feature_table2 <- filter_otus_by_counts_col_counts(feature_table, min_count = 1, col_number = 1) # why is this not working???
-  feature_table2 <- feature_table
+  feature_table2 <- filter_otus_by_counts_col_counts(feature_table, min_count = 1, col_number = 1) # why is this not working???
+  #feature_table2 <- feature_table
   
   # Remove columns (samples) with zero count
   if (ncol(feature_table2) > 1) {
     feature_table2 <- feature_table2[, colSums(feature_table2 != 0) > 0]
   }
   
+  if (isTRUE(strains)) {
+    # Convert table with strain names to a strain-number table
+    feature_table2 <- strain_name2strain_number(feature_table2)
+  }
+  
   # Saves species names from row_names
   species <- row.names(feature_table2)
+  
+  print(head(feature_table2))
   
   ### Step 2. If sorting, determine sample order.
   if (sort_type == "feature_value" && !is.null(feature_to_sort)) {
@@ -84,7 +92,7 @@ barplot_from_feature_table <- function(feature_table, sort_type = "None", featur
     print("Sort samples by similarity")
     
     # transform table
-    df1 <- transform_feature_table(feature_table = feature_table, transform_method = "min_max")
+    df1 <- transform_feature_table(feature_table = feature_table2, transform_method = "min_max")
     
     # Get the order of samples based on clustering
     ordered_samples <- order_samples_by_clustering(df1)
@@ -94,34 +102,79 @@ barplot_from_feature_table <- function(feature_table, sort_type = "None", featur
   }else if (sort_type == "none") {
     print("No sorting chosen")
     df1 <- feature_table2
-    ordered_samples <- colnames(feature_table)
+    ordered_samples <- colnames(feature_table2)
     # Generate a column with the names of ASVs/OTUs using rownames.
     df1["species"] <- species
   }else{
     print("No valid sorting option chosen")
+    return()
   }
   
-  print(head(df1))
-  print(species)
+  #print(head(df1))
+  #print(species)
   
   ### Step 3. Process features table to ploting table.
   # create the plot table
-  df_long <- df1 %>%
-    pivot_longer(-species, names_to = "sample", values_to = "Abundance")
+  plot_df <- df1 %>%
+    pivot_longer(-species, names_to = "sample", values_to = "abundance")
   
-  # Factor the "sample" variable so the order of samples is as in "ordered_samples" variable
-  df_long$Sample <- factor(df_long$sample, levels = ordered_samples)
-  
-  print(head(df_long))
-  
-  ### Step 4. Create plot.
-  if (is.null(colour_palette)) {
-    print("Colour pallette generated")
-    colour_palette <- get_palette(nColors = nrow(feature_table))
+  # If strain processing has to be done.
+  if (isTRUE(strains)) {
+    plot_df <- plot_df %>%
+      mutate(
+        strain = paste0("Strain ", sub(".* ", "", species)),  # Extract last number as strain
+        species2 = sub(" \\d+$", "", species)  # Remove strain number from species name
+      )
   }
   
-  otu_barplot <- ggplot2::ggplot(df_long, ggplot2::aes(x=Sample, y=Abundance, fill=species)) + 
-    ggplot2::geom_bar(position="fill", stat="identity", show.legend = TRUE) +
+  ### Step 4. Clean the long-format table
+  plot_df_filtered <- plot_df %>%
+    filter(!is.na(abundance) & abundance != 0)
+  
+  if (isTRUE(strains)) {
+    plot_df_filtered <- plot_df_filtered %>%
+      filter(!is.na(strain) & strain != 0)
+  }
+  
+  # Factor the "sample" variable so the order of samples is as in "ordered_samples" variable
+  plot_df_filtered$sample <- factor(plot_df_filtered$sample, levels = ordered_samples)
+  
+  print(head(plot_df_filtered))
+  
+  ### Step 4. Create plot.
+  if (is.null(colour_palette)) { # get colour palette
+    print("Colour pallette generated")
+    nfeatures <- length(unique(plot_df_filtered$species))
+    colour_palette <- get_palette(nColors = nfeatures)
+    print(colour_palette)
+  }
+  
+  # Create base plot.
+  ft_barplot <- ggplot2::ggplot(plot_df_filtered, ggplot2::aes(x=sample, y=abundance, fill=species))
+  
+  if (isTRUE(strains)) {
+    print("strains processing")
+    ft_barplot <- ft_barplot + ggpattern::geom_bar_pattern(aes(fill = species2, pattern = strain, pattern_density = strain),
+                                           position = "fill",
+                                           stat="identity",
+                                           show.legend = TRUE,
+                                           pattern_color = "white",
+                                           pattern_fill = "white",
+                                           pattern_angle = 45,
+                                           pattern_spacing = 0.025) +
+      ggpattern::scale_pattern_manual(values = c("Strain 1" = "none", "Strain 2" = "circle", "Strain 3" = "stripe")) +
+      ggpattern::scale_pattern_density_manual(values = c(0, 0.2, 0.1)) +
+      guides(pattern = guide_legend(override.aes = list(fill = "black")),
+             fill = guide_legend(override.aes = list(pattern = "none")))
+  } else{
+    print("no strains")
+    ft_barplot <- ft_barplot + geom_bar(aes(fill = species),
+                        position = position_fill(),
+                        stat = "identity") # ggplot2::geom_bar(position="fill", stat="identity", show.legend = TRUE)
+  }
+  
+  # add theme options
+  ft_barplot <- ft_barplot  + 
     ggplot2::scale_fill_manual(values=colour_palette) +
     ggplot2::theme(plot.title = ggplot2::element_text(size = 10, face = "bold"),
                    axis.title.x = ggplot2::element_text(size=x_axis_title_size),
@@ -133,8 +186,8 @@ barplot_from_feature_table <- function(feature_table, sort_type = "None", featur
                    legend.text=ggplot2::element_text(size=legend_text_size)) +
     guides(fill = guide_legend(ncol = legend_cols))
   
-  otu_barplot # show plot
-  return(otu_barplot) # return plot
+  ft_barplot # show plot
+  return(ft_barplot) # return plot
 }
 
 barplots_grid <- function(feature_tables, experiments_names, shared_samples = FALSE, strains = FALSE, plot_title = "",
