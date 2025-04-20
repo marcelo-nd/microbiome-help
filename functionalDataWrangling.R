@@ -27,9 +27,36 @@ library("ggplot2")
 ##### File parsing
 # Read and prepare FIA pos/neg table
 read_fia_table <- function(table_path, sheet = "pos", fix_names = FALSE, sort_table = TRUE){
-  feature_table <- readxl::read_excel(path = table_path, sheet = "pos", col_names = TRUE)
+  feature_table <- readxl::read_excel(path = table_path, sheet = sheet, col_names = TRUE)
   # Retain only necessary columns
   fia_df <- cbind(feature_table[, 2], feature_table[, 5:ncol(feature_table)])
+  # Transpose table
+  fia_df_t <- t(fia_df)
+  # Set column names as metabolites names
+  colnames(fia_df_t) <- fia_df_t[1,]
+  # Remove metnames column
+  fia_df_t <- fia_df_t[2:nrow(fia_df_t),]
+  # Reconvert to dataframe
+  fia_df_t <- as.data.frame(fia_df_t)
+  # Transform to numeric all columns
+  fia_df_t[,1:ncol(fia_df_t)] <- sapply(fia_df_t[,1:ncol(fia_df_t)],as.numeric)
+  # Check the data types of columns
+  #print(sapply(fia_df_t, class))
+  if (fix_names) {
+    colnames(fia_df_t) <- make.names(colnames(fia_df_t), unique=TRUE)
+  }
+  
+  if (isTRUE(sort_table)) {
+    fia_df_t <- fia_df_t[order(row.names(fia_df_t)), ] # sort my row names (sample names)
+  }
+  
+  return(fia_df_t)
+}
+
+read_targeted_table <- function(table_path, sheet = "pos", in_col = 5, fix_names = FALSE, sort_table = TRUE){
+  feature_table <- readxl::read_excel(path = table_path, sheet = sheet, col_names = TRUE)
+  # Retain only necessary columns
+  fia_df <- cbind(feature_table[1], feature_table[, in_col:ncol(feature_table)])
   # Transpose table
   fia_df_t <- t(fia_df)
   # Set column names as metabolites names
@@ -97,12 +124,12 @@ read_metadata <- function(path, sort_table = FALSE){
   return(md)
 }
 
-read_metadata_xls <- function(path, sheet, sort_table = FALSE){
+read_metadata_xls <- function(path, sheet, sort_table = FALSE, in_col = 2){
   md <- readxl::read_excel(path, sheet = sheet)
   
   md <- as.data.frame(md)
   row.names(md) <- md[,1]
-  md <- md[2:ncol(md)]
+  md <- md[in_col:ncol(md)]
   
   if(isTRUE(sort_table)){
     md <- md[order(row.names(md)), ] # sort my row names (sample names)
