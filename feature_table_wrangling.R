@@ -1,50 +1,66 @@
 
-# Sort otu table in barcodes numeration
-sort_nanopore_table_by_barcodes <- function(df, new_names = NULL){
-  cn <- colnames(df) # store column names
-  sorted_names <- cn[order(nchar(cn), cn)] # order columns names
-  df_sorted <- df[, sorted_names] # order data frame using colnames
-  if (!is.null(new_names) && ncol(df_sorted == length(new_names))) {
-    colnames(df_sorted) <- new_names
+# Funtion to remove features by name
+remove_feature_by_prefix <- function(df, patterns) {
+  # Create a single regex pattern that matches any of the species names at the start
+  combined_pattern <- paste0("^(", paste(patterns, collapse = "|"), ")")
+  
+  # Filter the dataframe: keep rows that do NOT match the pattern
+  df_filtered <- df[!grepl(combined_pattern, rownames(df)), ]
+  
+  return(df_filtered)
+}
+
+##### Table Filtering
+filter_features_by_col_counts <- function(feature_table, min_count, col_number){
+  if (ncol(feature_table) > 1) {
+    return(feature_table[which(rowSums(feature_table >= min_count) >= col_number), ])
+  }else{
+    return(feature_table)
   }
-  return(df_sorted)
 }
 
-#
-strain_name2strain_number <- function(df){
-  # Extract only the "Genus species" part
-  species_names <- sub(" \\S+$", "", rownames(df))  
-  
-  # Create a numeric ID for each strain within the same species
-  species_ids <- ave(species_names, species_names, FUN = function(x) seq_along(x))
-  
-  # Create new rownames with species + strain ID
-  new_rownames <- paste(species_names, species_ids)
-  
-  # Assign new rownames to the dataframe
-  rownames(df) <- new_rownames
-  
-  # Print the updated dataframe
-  #print(df)
-  return(df)
+transform_feature_table <- function(feature_table, transform_method){
+  if (transform_method == "zscale") {
+    # Z-Scaling
+    df_transformed <- as.data.frame(scale(feature_table))
+  } else if (transform_method == "min_max"){
+    df_transformed <- feature_table
+    normalize = function(x) (x- min(x))/(max(x) - min(x))
+    cols <- sapply(df_transformed, is.numeric)
+    df_transformed[cols] <- lapply(df_transformed[cols], normalize)
+  }else if (transform_method == "rel_abundance"){
+    # Relative abundance
+    df_transformed <- sweep(feature_table, 2, colSums(feature_table), FUN = "/")
+  } else{
+    "Transform method not valid"
+  }
+  return(df_transformed)
 }
 
-#
-get_inoculated_strains <- function(df2, sample_name) {
-  # Select the column corresponding to the sample
-  sample_column <- df2[[sample_name]]
+# Orders the samples of a feature table using ward clustering
+order_samples_by_clustering <- function(feature_table, diss_method = "euclidean", clust_method = "ward.D2"){
+  # Takes feature_table and returns the list of samples ordered according to the clustering algorithm
+  df_otu <- feature_table %>% rownames_to_column(var = "Species")
   
-  # Get row indices where the value is 1 (inoculated strains)
-  inoculated_indices <- which(sample_column == 1)
+  df_t <- as.matrix(t(df_otu[, -1]))  # Exclude the "Species" column after moving it to row names
   
-  # Extract the strain names based on the indices
-  inoculated_strains <- df2[inoculated_indices, 1]  # First column contains strain names
+  # Perform hierarchical clustering
+  d <- dist(df_t, method = diss_method)
+  hc <- hclust(d, method = clust_method)
   
-  return(inoculated_strains)
+  # Get the order of samples based on clustering
+  ordered_samples_cluster <- colnames(df_otu)[-1][hc$order]  # Remove "Species" again
+  
+  return(ordered_samples_cluster)
 }
 
 ##### Function to convert a OTU table to a strain-level-table
 # It takes the otu table at species level and a second dataframe including strain-level data.
+# First dataframe should be a dataframe containing species level data.
+# Second dataframe should be a dataframe containing
+# the strain inoculation data in the following format:
+
+
 merge_abundance_by_strain <- function(df1, df2) {
   df1 <- as.data.frame(df1)
   df2 <- as.data.frame(df2)
@@ -100,46 +116,66 @@ merge_abundance_by_strain <- function(df1, df2) {
   return(as.data.frame(new_abundance_matrix))
 }
 
-order_samples_by_clustering <- function(feature_table){
-  # Takes feature_table and returns the list of samples ordered according to the clustering algorithm
-  df_otu <- feature_table %>% rownames_to_column(var = "Species")
+get_inoculated_strains <- function(df2, sample_name) {
+  # Select the column corresponding to the sample
+  sample_column <- df2[[sample_name]]
   
-  df_t <- as.matrix(t(df_otu[, -1]))  # Exclude the "Species" column after moving it to row names
+  # Get row indices where the value is 1 (inoculated strains)
+  inoculated_indices <- which(sample_column == 1)
   
-  # Perform hierarchical clustering
-  d <- dist(df_t, method = "euclidean")
-  hc <- hclust(d, method = "ward.D2")
+  # Extract the strain names based on the indices
+  inoculated_strains <- df2[inoculated_indices, 1]  # First column contains strain names
   
-  # Get the order of samples based on clustering
-  ordered_samples_cluster <- colnames(df_otu)[-1][hc$order]  # Remove "Species" again
-  
-  return(ordered_samples_cluster)
+  return(inoculated_strains)
 }
 
-##### Table Filtering
-filter_otus_by_counts_col_counts <- function(otu_table, min_count, col_number){
-  if (ncol(otu_table) > 1) {
-    return(otu_table[which(rowSums(otu_table >= min_count) >= col_number), ])
-  }else{
-    return(otu_table)
-  }
+# This function takes a dataframe where the rownames are strain level OTUs/ASVs in the form:
+# Genera species strain data. The two first words are used a the Species names that are numbered then as:
+# Genera species 1; Genera species 2; Genera species 3
+strain_name2strain_number <- function(df){
+  # Extract only the "Genus species" part
+  species_names <- sub(" \\S+$", "", rownames(df))  
+  
+  # Create a numeric ID for each strain within the same species
+  species_ids <- ave(species_names, species_names, FUN = function(x) seq_along(x))
+  
+  # Create new rownames with species + strain ID
+  new_rownames <- paste(species_names, species_ids)
+  
+  # Assign new rownames to the dataframe
+  rownames(df) <- new_rownames
+  
+  # Print the updated dataframe
+  #print(df)
+  return(df)
 }
 
-##### Table Transformation
-transform_feature_table <- function(feature_table, transform_method){
-  if (transform_method == "zscale") {
-    # Z-Scaling
-    df_transformed <- as.data.frame(scale(feature_table))
-  } else if (transform_method == "min_max"){
-    df_transformed <- feature_table
-    normalize = function(x) (x- min(x))/(max(x) - min(x))
-    cols <- sapply(df_transformed, is.numeric)
-    df_transformed[cols] <- lapply(df_transformed[cols], normalize)
-  }else if (transform_method == "rel_abundance"){
-    # Relative abundance
-    df_transformed <- sweep(feature_table, 2, colSums(feature_table), FUN = "/")
-  } else{
-    "Transform method not valid"
+# Sort otu table in barcodes numeration
+sort_nanopore_table_by_barcodes <- function(df, new_names = NULL){
+  cn <- colnames(df) # store column names
+  sorted_names <- cn[order(nchar(cn), cn)] # order columns names
+  df_sorted <- df[, sorted_names] # order data frame using colnames
+  if (!is.null(new_names) && ncol(df_sorted) == length(new_names)) {
+    colnames(df_sorted) <- new_names
   }
-  return(df_transformed)
+  return(df_sorted)
+}
+
+# Function to set selected species/sample combinations to zero
+zero_out_species_in_samples <- function(df, species_name, sample_names) {
+  # Safety check: does the species exist?
+  if (!(species_name %in% rownames(df))) {
+    stop(paste("Species", species_name, "not found in rownames"))
+  }
+  
+  # Safety check: do all samples exist?
+  if (!all(sample_names %in% colnames(df))) {
+    missing_samples <- sample_names[!sample_names %in% colnames(df)]
+    stop(paste("Samples not found in dataframe:", paste(missing_samples, collapse = ", ")))
+  }
+  
+  # Set the selected cells to zero
+  df[species_name, sample_names] <- 0
+  
+  return(df)
 }

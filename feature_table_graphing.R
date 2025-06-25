@@ -2,11 +2,14 @@
 if (!require("ggplot2", quietly = TRUE))
   install.packages("ggplot2")
 
+if (!require("dplyr", quietly = TRUE))
+  install.packages("dplyr")
+
 if (!require("tidyr", quietly = TRUE))
   install.packages("tidyr")
 
-if (!require("dplyr", quietly = TRUE))
-  install.packages("dplyr")
+if (!require("tibble", quietly = TRUE))
+  install.packages("tibble")
 
 if (!require("ggpattern", quietly = TRUE))
   install.packages("ggpattern")
@@ -21,32 +24,33 @@ source("C:/Users/marce/Documents/GitHub/microbiome-help/feature_table_wrangling.
 
 get_palette <- function(nColors = 60){
   colors_vec <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442","#0072B2",
-    "brown1", "#CC79A7", "olivedrab3", "rosybrown", "darkorange3",
-    "blueviolet", "darkolivegreen4", "lightskyblue4", "navajowhite4",
-    "purple4", "springgreen4", "firebrick3", "gold3", "cyan3",
-    "plum", "mediumspringgreen", "blue", "yellow", "#053f73",
-    "lavenderblush4", "lawngreen", "indianred1", "lightblue1", "honeydew4",
-    "hotpink", "#e3ae78", "#a23f3f", "#290f76", "#ce7e00",
-    "#386857", "#738564", "#e89d56", "#cd541d", "#1a3a46",
-    "#9C4A1A", "#ffe599", "#583E26", "#A78B71", "#F7C815",
-    "#EC9704", "#4B1E19", "firebrick2", "#C8D2D1", "#14471E",
-    "#6279B8", "#DA6A00", "#C0587E", "#FC8B5E", "#FEF4C0",
-    "#EA592A", "khaki3", "lavenderblush3", "indianred4", "lightblue",
-    "honeydew1", "hotpink4", "ivory3", "#49516F", "#502F4C",
-    "#A8C686", "#669BBC", "#29335C", "#E4572E", "#F3A712",
-    "#EF5B5B", "#FFBA49", "#20A39E", "#23001E", "#A4A9AD")
+                  "brown1", "#CC79A7", "olivedrab3", "rosybrown", "darkorange3",
+                  "blueviolet", "darkolivegreen4", "lightskyblue4", "navajowhite4",
+                  "purple4", "springgreen4", "firebrick3", "gold3", "cyan3",
+                  "plum", "mediumspringgreen", "blue", "yellow", "#053f73",
+                  "lavenderblush4", "lawngreen", "indianred1", "lightblue1", "honeydew4",
+                  "hotpink", "#e3ae78", "#a23f3f", "#290f76", "#ce7e00",
+                  "#386857", "#738564", "#e89d56", "#cd541d", "#1a3a46",
+                  "#9C4A1A", "#ffe599", "#583E26", "#A78B71", "#F7C815",
+                  "#EC9704", "#4B1E19", "firebrick2", "#C8D2D1", "#14471E",
+                  "#6279B8", "#DA6A00", "#C0587E", "#FC8B5E", "#FEF4C0",
+                  "#EA592A", "khaki3", "lavenderblush3", "indianred4", "lightblue",
+                  "honeydew1", "hotpink4", "ivory3", "#49516F", "#502F4C",
+                  "#A8C686", "#669BBC", "#29335C", "#E4572E", "#F3A712",
+                  "#EF5B5B", "#FFBA49", "#20A39E", "#23001E", "#A4A9AD")
   
   #set.seed(1)
-
+  
   return(colors_vec[sample(1:length(colors_vec), size = nColors)])
 }
 
 # todo: strain level
 barplot_from_feature_table <- function(feature_table, sort_type = "none", feature_to_sort = NULL, strains = FALSE,
                                        plot_title = "", plot_title_size = 14,
-                                       x_axis_text_size = 12, x_axis_title_size = 12,
-                                       y_axis_title_size = 12, y_axis_text_size = 12,
+                                       x_axis_text_size = 12, x_axis_title_size = 12, x_axis_text_angle = 0,
+                                       y_axis_title_size = 12, y_axis_text_size = 12, y_axis_text_angle = 90,
                                        legend_pos = "right", legend_title_size = 12, legend_text_size = 12, legend_cols = 3,
+                                       x_vjust = 0.5, x_hjust = 1, 
                                        colour_palette = NULL){
   ### Step 1. Clean feature table
   # Remove empty rows (features)
@@ -155,13 +159,13 @@ barplot_from_feature_table <- function(feature_table, sort_type = "none", featur
   if (isTRUE(strains)) {
     print("strains processing")
     ft_barplot <- ft_barplot + ggpattern::geom_bar_pattern(aes(fill = species2, pattern = strain, pattern_density = strain),
-                                           position = "fill",
-                                           stat="identity",
-                                           show.legend = TRUE,
-                                           pattern_color = "white",
-                                           pattern_fill = "white",
-                                           pattern_angle = 45,
-                                           pattern_spacing = 0.025) +
+                                                           position = "fill",
+                                                           stat="identity",
+                                                           show.legend = TRUE,
+                                                           pattern_color = "white",
+                                                           pattern_fill = "white",
+                                                           pattern_angle = 45,
+                                                           pattern_spacing = 0.025) +
       ggpattern::scale_pattern_manual(values = c("Strain 1" = "none", "Strain 2" = "circle", "Strain 3" = "stripe")) +
       ggpattern::scale_pattern_density_manual(values = c(0, 0.2, 0.1)) +
       guides(pattern = guide_legend(override.aes = list(fill = "black")),
@@ -169,17 +173,18 @@ barplot_from_feature_table <- function(feature_table, sort_type = "none", featur
   } else{
     print("no strains")
     ft_barplot <- ft_barplot + geom_bar(aes(fill = species),
-                        position = position_fill(),
-                        stat = "identity") # ggplot2::geom_bar(position="fill", stat="identity", show.legend = TRUE)
+                                        position = position_fill(),
+                                        stat = "identity")
   }
   
   # add theme options
-  ft_barplot <- ft_barplot  + 
+  ft_barplot <- ft_barplot  +
+    theme_void() +
     ggplot2::scale_fill_manual(values=colour_palette) +
     ggplot2::theme(plot.title = ggplot2::element_text(size = 10, face = "bold"),
                    axis.title.x = ggplot2::element_text(size=x_axis_title_size),
-                   axis.text.x = ggplot2::element_text(angle = 90, vjust = 0.5, hjust=1, size = x_axis_text_size),
-                   axis.title.y = ggplot2::element_text(size=y_axis_title_size),
+                   axis.text.x = ggplot2::element_text(angle = x_axis_text_angle, vjust = x_vjust, hjust= x_hjust, size = x_axis_text_size),
+                   axis.title.y = ggplot2::element_text(size=y_axis_title_size, angle = y_axis_text_angle, margin = margin(t = 0, r = 5, b = 0, l = 0)),
                    axis.text.y = ggplot2::element_text(size = x_axis_text_size),
                    legend.position=legend_pos,
                    legend.title=ggplot2::element_text(size=legend_title_size),
@@ -188,6 +193,34 @@ barplot_from_feature_table <- function(feature_table, sort_type = "none", featur
   
   ft_barplot # show plot
   return(ft_barplot) # return plot
+}
+
+dendrogram_from_feature_table <- function(df, diss_method = "euclidean", clust_method = "ward.D2",
+                                          margin_t = 40, margin_r = 0, margin_b = -25, margin_l = 0){
+  # Prepare table
+  df_n <- transform_feature_table(df, transform_method = "min_max")
+  
+  df_n <- df_n %>% rownames_to_column(var = "Species")
+  
+  df_t <- as.matrix(t(df_n[, -1]))  # Exclude the "Species" column after moving it to row names
+  
+  #print(head(df_t))
+  
+  # Perform hierarchical clustering
+  d <- dist(df_t, method = diss_method)
+  hc <- hclust(d, method = clust_method)
+  
+  dendo_plot <- ggdendro::ggdendrogram(hc, rotate = 0,
+                                       leaf_labels = F) +
+    theme(plot.margin = margin(t = margin_t,  # Top margin
+                               r = margin_r,  # Right margin
+                               b = margin_b,  # Bottom margin
+                               l = margin_l)) + # Left margin
+    scale_y_continuous(expand = expansion(add = c(1, 1)), labels = NULL) + 
+    scale_x_continuous(expand = expansion(add = c(0.35, 0.5)), labels = NULL)
+  
+  dendo_plot
+  return(dendo_plot)
 }
 
 barplots_grid <- function(feature_tables, experiments_names, shared_samples = FALSE, strains = FALSE, plot_title = "",
@@ -211,7 +244,7 @@ barplots_grid <- function(feature_tables, experiments_names, shared_samples = FA
     }
     
     # Remove rows with Zero counts
-    feature_table <- filter_species_by_col_counts(feature_table, min_count = 1, col_number = 1)
+    feature_table <- filter_features_by_col_counts(feature_table, min_count = 1, col_number = 1)
     
     #print(head(feature_table2))
     
@@ -335,31 +368,4 @@ barplots_grid <- function(feature_tables, experiments_names, shared_samples = FA
   p1
   
   return(p1)
-}
-
-dendrogram_from_feature_table <- function(df){
-  # Prepare table
-  df_n <- transform_feature_table(df, transform_method = "min_max")
-  
-  df_n <- df_n %>% rownames_to_column(var = "Species")
-  
-  df_t <- as.matrix(t(df_n[, -1]))  # Exclude the "Species" column after moving it to row names
-  
-  #print(head(df_t))
-  
-  # Perform hierarchical clustering
-  d <- dist(df_t, method = "euclidean")
-  hc <- hclust(d, method = "ward.D2")
-  
-  dendo_plot <- ggdendro::ggdendrogram(hc, rotate = 0,
-                     leaf_labels = F) +
-    theme(plot.margin = margin(t = 40,  # Top margin
-                               r = 0,  # Right margin
-                               b = -25,  # Bottom margin
-                               l = 0)) + # Left margin
-    scale_y_continuous(expand = expansion(add = c(1, 1)), labels = NULL) + 
-    scale_x_continuous(expand = expansion(add = c(0.35, 0.5)), labels = NULL)
-  
-  dendo_plot
-  return(dendo_plot)
 }

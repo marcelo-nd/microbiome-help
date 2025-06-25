@@ -617,7 +617,7 @@ stability_per_period <- function(replicate_data, period_length, time_unit = "day
   return(results_df)
 }
 
-feature_table_heatmap <- function(ft1, ft2){
+feature_table_heatmap <- function(ft1, ft2, sig_stars = FALSE){
   ft1_t <- t(ft1)
   ft1_t <- ft1_t[order(row.names(ft1_t)), ] # Ordering by row names
   
@@ -625,13 +625,47 @@ feature_table_heatmap <- function(ft1, ft2){
   ft2_t <- t(ft2)
   ft2_t <- ft2_t[order(row.names(ft2_t)), ] # Ordering by row names
   
+  #print(rownames(ft1_t))
+  #print(colnames(ft2_t))
   
+  # Calculate correlations
   ft1Xft2 <- cor(ft1_t, ft2_t, method = "pearson")
+  
+  # Calculate significance
+  if (sig_stars) {
+    adxm.pval <- as.data.frame(Hmisc::rcorr(ft1_t, ft2_t, type = "spearman")$P)
+    
+    if (identical(ft1, ft2)) {
+      adxm.pval <- adxm.pval[1:(nrow(adxm.pval)/2), 1:(ncol(adxm.pval)/2)]
+      # Converting rownames to column 1
+      adxm.pval <- cbind(rownames(ft1), data.frame(adxm.pval, row.names=NULL))
+    }else{
+      adxm.pval <- adxm.pval[1:(nrow(ft1)), (nrow(ft1)+1):ncol(adxm.pval)]
+      # Converting rownames to column 1
+      adxm.pval <- cbind(rownames(adxm.pval), data.frame(adxm.pval, row.names=NULL))
+    }
+    colnames(adxm.pval)[1] <- "species"
+    rownames(adxm.pval) <- adxm.pval$species
+    adxm.pval <- adxm.pval[2:ncol(adxm.pval)]
+    
+    pval.mat <- as.matrix(adxm.pval)
+    
+    #print(head(adxm.pval))
+    #print(head(ft1Xft2))
+    
+    print(rownames(ft1Xft2))
+    print(colnames(pval.mat))
+    
+    #return(pval.mat)
+    #return(ft1Xft2)
+      corrplot::corrplot(corr = ft1Xft2, p.mat = pval.mat, method = "circle", tl.cex=0.1, sig.level = 0.05, insig = "label_sig", pch.cex = 0.5)
+  }else{
+    corrplot::corrplot(corr = ft1Xft2, method = "circle", tl.cex=0.5)
+  }
   #heatmap(ft1Xft2)
-  corrplot::corrplot(ft1Xft2, , tl.cex=0.5)
 }
 
-feature_table_heatmap_w_sig <- function(ft1, ft2){
+feature_table_heatmap_w_sig <- function(ft1, ft2, fdr_correction =NULL, sig_levels = FALSE){
   ft1_t <- t(ft1)
   ft1_t <- ft1_t[order(row.names(ft1_t)), ] # Ordering by row names
   
@@ -676,18 +710,28 @@ feature_table_heatmap_w_sig <- function(ft1, ft2){
   # Remove NAs
   pvals[is.na(pvals)] <- 1
   
+  if (!is.null(fdr_correction)) {
+    pvals <- p.adjust(pvals, method = fdr_correction)
+  }
+  
   # Create column of significance labels
   adXm_g["pvals"] <- pvals
   
   # Create column of significance labels
-  adXm_g["stars"] <- cut(pvals, breaks=c(-Inf, 0.001, 0.01, 0.05, Inf), label=c("***", "**", "*", ""))
+  if (sig_levels) {
+    adXm_g["stars"] <- cut(pvals, breaks=c(-Inf, 0.001, 0.01, 0.05, Inf), label=c("***", "**", "*", ""))
+  }
+  else{
+    adXm_g["stars"] <- cut(pvals, breaks=c(-Inf, 0.05, Inf), label=c("*", ""))
+  }
+  
   
   # Plotting
   ggplot(aes(x=compound, y=species, fill=correlation), data=adXm_g) +
     geom_tile() +
     scale_fill_gradient2(low="#D7191C", mid="white", high="#2C7BB6") +
     geom_text(aes(label=stars), color="black", size=2) +
-    theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust=1))
+    theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust=1, size = 3))
   
 }
 
@@ -709,4 +753,63 @@ ft_imputation <- function(ft){
                       imp[,i])
   }
   return(imp)
+}
+
+
+
+
+
+
+feature_table_heatmap2 <- function(ft1, ft2 = NULL, sig_stars = FALSE, corr_type = "pearson", pval_adjust = TRUE, fdr_correction = "fdr", axis_text_size = 1, stars_size = 0.5, hm_type = "full"){
+  ft1_t <- t(ft1)
+  ft1_t <- ft1_t[order(row.names(ft1_t)), ] # Ordering by row names
+  #print(rownames(ft1_t))
+  if (is.null(ft2)) {
+    # Get correlation results
+    corr_results <- Hmisc::rcorr(x = ft1_t, type = corr_type)
+    #corr_mat <- as.data.frame(corr_results$r)
+    corr_mat <- corr_results$r
+    print(head(corr_mat))
+  }else{
+    ft2_t <- t(ft2)
+    ft2_t <- ft2_t[order(row.names(ft2_t)), ] # Ordering by row names
+    corr_results <- Hmisc::rcorr(x = ft1_t, y = ft2_t,type = corr_type)
+    #corr_mat <- as.data.frame(corr_results$r)
+    corr_mat <- corr_results$r
+    
+    corr_mat <- corr_mat[1:(nrow(ft1)), (nrow(ft1)+1):ncol(corr_mat)]
+  }
+  # Calculate significance
+  if (sig_stars) {
+    pval_mat <- corr_results$P
+    
+    if (pval_adjust) {
+      # Flatten the matrix
+      pval_vector <- as.vector(pval_mat)
+      
+      # Apply FDR correction
+      fdr_vector <- p.adjust(pval_vector, method = fdr_correction)
+      
+      # Reshape back into a matrix
+      fdr_matrix <- matrix(fdr_vector, nrow = nrow(pval_mat), ncol = ncol(pval_mat))
+      rownames(fdr_matrix) <- rownames(pval_mat)
+      colnames(fdr_matrix) <- colnames(pval_mat)
+      pval_mat <- fdr_matrix
+    }
+    
+    # keep only the need correlation
+    if (!is.null(ft2)) {
+      pval_mat <- pval_mat[1:(nrow(ft1)), (nrow(ft1)+1):ncol(pval_mat)]
+    }
+
+    #print(head(corr_mat))
+    #return(corr_mat)
+    
+    #print(pval_mat)
+    #return(pval_mat)
+    
+    corrplot::corrplot(corr = corr_mat, p.mat = pval_mat, method = "circle", tl.cex=axis_text_size, sig.level = 0.05, insig = "label_sig", pch.cex = stars_size, tl.srt = 35, type = hm_type)
+  }else{
+    corrplot::corrplot(corr = corr_mat, method = "circle", tl.cex = axis_text_size, pch.cex = stars_size, type = hm_type)
+  }
 }
