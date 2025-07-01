@@ -184,7 +184,7 @@ zero_out_species_in_samples <- function(df, species_name, sample_names) {
 }
 
 # Read Hitchhikers guide style export feature table
-read_ft <- function(path, sort_by_names = FALSE){
+read_ft <- function(path, sort_by_names = FALSE, p_sep = ","){
   ft <- read.csv(path, header = TRUE, row.names = 1) #read csv table
   if(isTRUE(sort_by_names)){
     ft <- ft[order(row.names(ft)), ] # sort my row names (sample names)
