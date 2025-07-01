@@ -107,15 +107,6 @@ read_lcms_table <- function(table_path, sheet = "Ratios", fix_names = FALSE, sor
   return(fia_df_t)
 }
 
-read_ft_1 <- function(path, sort_by_names = FALSE){
-  # Read Hitschickers guide style export feature table
-  ft <- read.csv(path, header = TRUE, row.names = 1) #read csv table
-  if(isTRUE(sort_by_names)){
-    ft <- ft[order(row.names(ft)), ] # sort my row names (sample names)
-  }
-  return(ft)
-}
-
 read_metadata <- function(path, sort_table = FALSE){
   md <- read.csv(path, row.names = 1)
   if(isTRUE(sort_table)){

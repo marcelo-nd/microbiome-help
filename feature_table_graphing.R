@@ -54,7 +54,7 @@ barplot_from_feature_table <- function(feature_table, sort_type = "none", featur
                                        colour_palette = NULL){
   ### Step 1. Clean feature table
   # Remove empty rows (features)
-  feature_table2 <- filter_features_by_counts_col_counts(feature_table, min_count = 1, col_number = 1) # why is this not working???
+  feature_table2 <- filter_features_by_col_counts(feature_table, min_count = 1, col_number = 1) # why is this not working???
   #feature_table2 <- feature_table
   
   # Remove columns (samples) with zero count
@@ -223,9 +223,10 @@ dendrogram_from_feature_table <- function(df, diss_method = "euclidean", clust_m
   return(dendo_plot)
 }
 
+
 barplots_grid <- function(feature_tables, experiments_names, shared_samples = FALSE, strains = FALSE, plot_title = "",
-                          plot_title_size = 14, x_axis_text_size = 12, x_axis_title_size = 12,
-                          y_axis_title_size = 12, y_axis_text_size = 12,
+                          plot_title_size = 14, x_axis_text_size = 12, x_axis_title_size = 12, x_axis_text_angle = 0,
+                          y_axis_title_size = 12, y_axis_text_size = 12, y_axis_text_angle = 0,
                           legend_pos = "right", legend_title_size = 12, legend_text_size = 12, legend_cols = 3, legend_key_size = 1, 
                           colour_palette = NULL){
   # Creates a grid of Barplots
@@ -354,18 +355,84 @@ barplots_grid <- function(feature_tables, experiments_names, shared_samples = FA
   }
   
   p1 <- p1 +
+    theme_void() +
     ggplot2::theme(plot.title = ggplot2::element_text(size = plot_title_size, face = "bold", hjust = 0.5, vjust = 0.5),
                    axis.title.x = ggplot2::element_text(size=x_axis_title_size),
-                   axis.text.x = ggplot2::element_text(angle = 90, vjust = 0.5, hjust=1, size = x_axis_text_size),
-                   axis.title.y = ggplot2::element_text(size=y_axis_title_size),
-                   axis.text.y = ggplot2::element_text(size = x_axis_text_size),
+                   axis.text.x = ggplot2::element_text(angle = x_axis_text_angle, vjust = 0.5, hjust=1, size = x_axis_text_size),
+                   axis.title.y = ggplot2::element_text(size=y_axis_title_size, angle = 90),
+                   axis.text.y = ggplot2::element_text(size = x_axis_text_size, angle = y_axis_text_angle),
                    legend.title=ggplot2::element_text(size=legend_title_size),
                    legend.text=ggplot2::element_text(size=legend_text_size),
                    legend.position=legend_pos, legend.key.size = unit(legend_key_size, "cm")) + 
     guides(fill = guide_legend(ncol = legend_cols))
-  
+
   # Show plot
   p1
   
   return(p1)
+}
+
+feature_table_heatmap <- function(ft1, ft2 = NULL, sig_stars = FALSE, corr_type = "pearson", pval_adjust = TRUE, fdr_correction = "fdr", axis_text_size = 1, stars_size = 0.5, hm_type = "full"){
+  ft1_t <- t(ft1)
+  ft1_t <- ft1_t[order(row.names(ft1_t)), ] # Ordering by row names
+  #print(rownames(ft1_t))
+  if (is.null(ft2)) {
+    # Get correlation results
+    corr_results <- Hmisc::rcorr(x = ft1_t, type = corr_type)
+    #corr_mat <- as.data.frame(corr_results$r)
+    corr_mat <- corr_results$r
+    print(head(corr_mat))
+  }else{
+    ft2_t <- t(ft2)
+    ft2_t <- ft2_t[order(row.names(ft2_t)), ] # Ordering by row names
+    corr_results <- Hmisc::rcorr(x = ft1_t, y = ft2_t,type = corr_type)
+    #corr_mat <- as.data.frame(corr_results$r)
+    corr_mat <- corr_results$r
+    
+    corr_mat <- corr_mat[1:(nrow(ft1)), (nrow(ft1)+1):ncol(corr_mat)]
+  }
+  # Calculate significance
+  if (sig_stars) {
+    pval_mat <- corr_results$P
+    
+    if (pval_adjust) {
+      # Flatten the matrix
+      pval_vector <- as.vector(pval_mat)
+      
+      # Apply FDR correction
+      fdr_vector <- p.adjust(pval_vector, method = fdr_correction)
+      
+      # Reshape back into a matrix
+      fdr_matrix <- matrix(fdr_vector, nrow = nrow(pval_mat), ncol = ncol(pval_mat))
+      rownames(fdr_matrix) <- rownames(pval_mat)
+      colnames(fdr_matrix) <- colnames(pval_mat)
+      pval_mat <- fdr_matrix
+    }
+    
+    # keep only the need correlation
+    if (!is.null(ft2)) {
+      pval_mat <- pval_mat[1:(nrow(ft1)), (nrow(ft1)+1):ncol(pval_mat)]
+    }
+    print("error1")
+    #print(head(corr_mat))
+    #return(corr_mat)
+    
+    #print(pval_mat)
+    #return(pval_mat)
+    
+    print(nrow(corr_mat))
+    print(ncol(corr_mat))
+    print(nrow(pval_mat))
+    print(ncol(pval_mat))
+    
+    # Remove NAs in p-value matrix
+    pval_mat[is.na(pval_mat)] <- 1
+
+    print(head(corr_mat))
+    print(head(pval_mat))
+    
+    corrplot::corrplot(corr = corr_mat, p.mat = pval_mat, method = "circle", tl.cex=axis_text_size, sig.level = 0.05, insig = "label_sig", pch.cex = stars_size, tl.srt = 35, type = hm_type)
+  }else{
+    corrplot::corrplot(corr = corr_mat, method = "circle", tl.cex = axis_text_size, pch.cex = stars_size, type = hm_type)
+  }
 }

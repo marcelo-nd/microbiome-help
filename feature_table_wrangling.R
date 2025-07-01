@@ -14,8 +14,13 @@ remove_feature_by_prefix <- function(df, patterns) {
 filter_features_by_col_counts <- function(feature_table, min_count, col_number){
   if (ncol(feature_table) > 1) {
     return(feature_table[which(rowSums(feature_table >= min_count) >= col_number), ])
-  }else{
-    return(feature_table)
+  }
+  else if(ncol(feature_table) == 1){
+    ft <- feature_table[feature_table >= min_count, ,drop=FALSE]
+    return(ft)
+  }
+  else{
+    print("Dataframe has no columns")
   }
 }
 
@@ -59,8 +64,6 @@ order_samples_by_clustering <- function(feature_table, diss_method = "euclidean"
 # First dataframe should be a dataframe containing species level data.
 # Second dataframe should be a dataframe containing
 # the strain inoculation data in the following format:
-
-
 merge_abundance_by_strain <- function(df1, df2) {
   df1 <- as.data.frame(df1)
   df2 <- as.data.frame(df2)
@@ -178,4 +181,13 @@ zero_out_species_in_samples <- function(df, species_name, sample_names) {
   df[species_name, sample_names] <- 0
   
   return(df)
+}
+
+# Read Hitchhikers guide style export feature table
+read_ft <- function(path, sort_by_names = FALSE){
+  ft <- read.csv(path, header = TRUE, row.names = 1) #read csv table
+  if(isTRUE(sort_by_names)){
+    ft <- ft[order(row.names(ft)), ] # sort my row names (sample names)
+  }
+  return(ft)
 }
