@@ -189,5 +189,16 @@ read_ft <- function(path, sort_by_names = FALSE){
   if(isTRUE(sort_by_names)){
     ft <- ft[order(row.names(ft)), ] # sort my row names (sample names)
   }
-  return(ft)
+  
+  rownames(ft) <- gsub("\\.mzML$", "", rownames(ft))
+  
+  return(t(ft))
+}
+
+read_metadata <- function(path, sort_table = FALSE){
+  md <- read.csv(path, row.names = 1)
+  if(isTRUE(sort_table)){
+    md <- md[order(row.names(md)), ] # sort my row names (sample names)
+  }
+  return(md)
 }

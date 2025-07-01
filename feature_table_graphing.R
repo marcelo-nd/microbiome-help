@@ -436,3 +436,124 @@ feature_table_heatmap <- function(ft1, ft2 = NULL, sig_stars = FALSE, corr_type 
     corrplot::corrplot(corr = corr_mat, method = "circle", tl.cex = axis_text_size, pch.cex = stars_size, type = hm_type)
   }
 }
+
+
+ft_pca_1 <- function(ft, metadata_table, grouping_col, color_palette = NULL, encircle = FALSE, dist_method = "euclidean",
+                     pca_scale = TRUE, pca_center = TRUE){
+  # transposing feature table
+  ft_t <- t(feature_table)
+  if (isTRUE(all.equal(rownames(ft_t), rownames(metadata_table)))) {
+    print("Sample names in feature table and metadatable are identical :)")
+    
+    # 1. Calculate Bray-Curtis dissimilarity
+    dist_mat <- vegan::vegdist(ft_t, method = dist_method)
+    
+    # 2. Convert the distance matrix to a matrix object
+    dist_mat <- as.matrix(dist_mat)
+    
+    print(head(dist_mat))
+    
+    fia_pca <- PCAtools::pca(dist_mat, scale = pca_scale, center = pca_center, metadata = metadata_table, transposed = TRUE)
+    
+    if (is.null(color_palette)) {
+      color_palette = get_palette(nColors = 60)
+    }
+    
+    p2 <- PCAtools::biplot(fia_pca, showLoadings = TRUE, ntopLoadings = 0, lab = NULL, colby = grouping_col,
+                           legendPosition = "right", axisLabSize = 8, legendLabSize = 8, legendIconSize = 2, pointSize = 1.5,
+                           colkey = color_palette, encircle = encircle, colLegendTitle = "SynCom")
+    
+    p2
+  }else{
+    print("Sample names in feature table and metadatable are not identical")
+    #print(all.equal(colnames(ft_t),metadata_table$Sample))
+  }
+}
+
+ft_pca_2 <- function(feature_table, metadata_table, grouping_col = NULL, p_shape = NULL, dist_method = "euclidean"){
+  # Compute distance matrix according to dist_method
+  dist_matrix <- vegan::vegdist(feature_table, method = dist_method)
+  
+  # Perform PCoA
+  pcoa_results <- cmdscale(dist_matrix, k = 2, eig = TRUE)
+  
+  pcoa_df <- as.data.frame(pcoa_results$points)
+  colnames(pcoa_df) <- c("PC1", "PC2")  # Rename axes
+  pcoa_df$Sample <- rownames(feature_table)  # Add sample names to pcoa_df
+  
+  metadata_table$Sample <- rownames(metadata_table)  # Add sample names to pcoa_df
+  
+  #print(pcoa_df$Sample == row.names(metadata_table))
+  if (identical(pcoa_df$Sample,row.names(metadata_table))) {
+    print("Sample names in feature table and metadatable are identical :)")
+    
+  } else{
+    print("Sample names in feature table and metadatable are not identical")
+    return()
+  }
+  
+  pcoa_df <- left_join(pcoa_df, metadata_table, by = c("Sample" = "Sample"))
+  colour_palette <- get_palette(nColors = 20)
+  #print(colour_palette)
+  
+  if (is.null(grouping_col) && is.null(p_shape)) {
+    ggplot(pcoa_df, aes(x = PC1, y = PC2)) +
+      geom_point(size = 3) +
+      theme_minimal() +
+      scale_color_manual(values=colour_palette) +
+      labs(title = "PCoA Plot",
+           x = "PCoA 1",
+           y = "PCoA 2")
+  }else if(!is.null(grouping_col) && is.null(p_shape)){
+    print("Plotting with grouping variable")
+    ggplot(pcoa_df, aes(x = PC1, y = PC2, color = .data[[grouping_col]])) +
+      geom_point(size = 3) +
+      theme_minimal() +
+      scale_color_manual(values=colour_palette) +
+      labs(title = "PCoA Plot",
+           x = "PCoA 1",
+           y = "PCoA 2",
+           color = "Sample Type") +
+      theme(legend.position = "right")  +
+      guides(color = guide_legend(ncol = 2))
+  }else if(!is.null(grouping_col) && !is.null(p_shape)){
+    print("Plotting with two grouping variables")
+    ggplot(pcoa_df, aes(x = PC1, y = PC2, color = .data[[grouping_col]], shape = .data[[p_shape]])) +
+      geom_point(size = 3) +
+      theme_minimal() +
+      scale_color_manual(values=colour_palette) +
+      labs(title = "PCoA Plot",
+           x = "PCoA 1",
+           y = "PCoA 2",
+           color = "Sample Type") +
+      theme(legend.position = "right")  +
+      guides(color = guide_legend(ncol = 2))
+  }
+  
+}
+
+
+# Do PCA plot, prev. fia_pca (DELETE)
+ft_pca_1 <- function(feature_table, metadata_table, grouping_col, color_palette = NULL, encircle = FALSE){
+  # transposing feature table
+  ft_t <- t(feature_table)
+  if (isTRUE(all.equal(colnames(ft_t),row.names(metadata_table)))) {
+    print("Sample names in feature table and metadatable are identical :)")
+    
+    fia_pca <- PCAtools::pca(ft_t, scale = TRUE, metadata = metadata_table, transposed = FALSE)
+    
+    if (is.null(color_palette)) {
+      color_palette = get_palette(nColors = 60)
+    }
+    
+    p2 <- PCAtools::biplot(fia_pca, showLoadings = TRUE, ntopLoadings = 0, lab = NULL, colby = grouping_col,
+                           legendPosition = "right", axisLabSize = 8, legendLabSize = 8, legendIconSize = 2, pointSize = 1.5,
+                           colkey = color_palette, encircle = encircle, colLegendTitle = "SynCom")
+    
+    p2
+  }else{
+    print("Sample names in feature table and metadatable are not identical")
+    #print(all.equal(colnames(ft_t),metadata_table$Sample))
+  }
+  
+}
