@@ -185,13 +185,16 @@ zero_out_species_in_samples <- function(df, species_name, sample_names) {
 
 # Read Hitchhikers guide style export feature table
 read_ft <- function(path, sort_by_names = FALSE, p_sep = ","){
-  ft <- read.csv(path, header = TRUE, row.names = 1) #read csv table
+  ft <- read.csv2(path, header = TRUE, row.names = 1, sep = p_sep, dec = ".") #read csv table
   if(isTRUE(sort_by_names)){
     ft <- ft[order(row.names(ft)), ] # sort my row names (sample names)
   }
   
   rownames(ft) <- gsub("\\.mzML$", "", rownames(ft))
-  
+  #col_names <- colnames(ft)
+  #ft <- sapply(ft, as.numeric)
+  #ft <- as.data.frame(ft)
+  #colnames(ft) <- col_names
   return(t(ft))
 }
 

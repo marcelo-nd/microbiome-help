@@ -372,7 +372,7 @@ barplots_grid <- function(feature_tables, experiments_names, shared_samples = FA
   return(p1)
 }
 
-feature_table_heatmap <- function(ft1, ft2 = NULL, sig_stars = FALSE, corr_type = "pearson", pval_adjust = TRUE, fdr_correction = "fdr", axis_text_size = 1, stars_size = 0.5, hm_type = "full"){
+feature_table_heatmap <- function(ft1, ft2 = NULL, sig_stars = FALSE, corr_type = "pearson", pval_adjust = TRUE, fdr_correction = "fdr", axis_text_size = 1, stars_size = 0.5, hm_type = "full", text_angle = 35){
   ft1_t <- t(ft1)
   ft1_t <- ft1_t[order(row.names(ft1_t)), ] # Ordering by row names
   #print(rownames(ft1_t))
@@ -431,7 +431,7 @@ feature_table_heatmap <- function(ft1, ft2 = NULL, sig_stars = FALSE, corr_type 
     print(head(corr_mat))
     print(head(pval_mat))
     
-    corrplot::corrplot(corr = corr_mat, p.mat = pval_mat, method = "circle", tl.cex=axis_text_size, sig.level = 0.05, insig = "label_sig", pch.cex = stars_size, tl.srt = 35, type = hm_type)
+    corrplot::corrplot(corr = corr_mat, p.mat = pval_mat, method = "circle", tl.cex=axis_text_size, sig.level = 0.05, insig = "label_sig", pch.cex = stars_size, tl.srt = text_angle, type = hm_type)
   }else{
     corrplot::corrplot(corr = corr_mat, method = "circle", tl.cex = axis_text_size, pch.cex = stars_size, type = hm_type)
   }
