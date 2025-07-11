@@ -205,3 +205,72 @@ read_metadata <- function(path, sort_table = FALSE){
   }
   return(md)
 }
+
+flag_samples_by_abundance <- function(feature_df, metadata_df, feature_name, percentage_threshold) {
+  # 1. Check if feature_df and metadata_df have the same samples in the same order
+  if (identical(colnames(feature_df), rownames(metadata_df))) {
+    print("Both dataframes have the same sample names")
+  }else{
+    print("Both dataframes have different sample names")
+    return()
+  }
+  
+  # 2. Check that the feature_name exists in feature_df
+  if (!feature_name %in% rownames(feature_df)) {
+    stop("The feature name is not found in the feature dataframe.")
+  }
+  
+  # 3. Get the vector of abundances for that feature
+  feature_abundances <- feature_df[feature_name, ]
+  
+  # 4. Calculate percentage per sample
+  # First calculate total abundance per sample
+  total_abundance <- colSums(feature_df)
+  
+  percentage_abundance <- (feature_abundances / total_abundance) * 100
+  
+  # 5. Create logical vector indicating whether each sample is above threshold
+  above_threshold <- percentage_abundance >= percentage_threshold
+  
+  # 6. Make a copy of the metadata and add the new column
+  metadata_copy <- metadata_df
+  new_colname <- paste0("above_", percentage_threshold, "pct_", gsub(" ", "_", feature_name))
+  metadata_copy[[new_colname]] <- above_threshold[1,]
+  
+  # Return modified metadata
+  return(metadata_copy)
+}
+
+# Takes an feature table (OTUs) and removes the strain information from the species NOT in the passed vector of species
+merge_non_target_strains <- function(df, target_species) {
+  # Extract species names (first two words) from rownames
+  species_names <- sapply(strsplit(rownames(df), " "), function(x) paste(x[1:2], collapse = " "))
+  #print(species_names)
+  # Identify which rows belong to target or non-target species
+  is_target <- species_names %in% target_species
+  #print(is_target)
+  # Separate target and non-target
+  target_df <- df[is_target, , drop = FALSE]
+  #print(target_df)
+  non_target_df <- df[!is_target, , drop = FALSE]
+  #print(non_target_df)
+  non_target_species <- species_names[!is_target]
+  #print(non_target_species)
+  # 
+  # # Aggregate non-target strains by species
+  if (nrow(non_target_df) > 0) {
+    aggregated <- aggregate(non_target_df, by = list(Species = non_target_species), FUN = sum)
+    # Set the species name as rownames and remove the Group column
+    # >>> THIS IS WHERE YOU ADD " 1" TO THE SPECIES NAMES <<<
+    rownames(aggregated) <- paste(aggregated$Species, "1")
+    #rownames(aggregated) <- aggregated$Species
+    aggregated$Species <- NULL
+  } else {
+    aggregated <- NULL
+  }
+  print(aggregated)
+  # Combine target and aggregated non-target dataframes
+  result <- rbind(target_df, aggregated)
+  
+  return(result)
+}
