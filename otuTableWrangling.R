@@ -163,3 +163,175 @@ order_samples_by_clustering <- function(feature_table){
   
   return(ordered_samples_cluster)
 }
+
+
+
+# This function takes a dataframe, a string of species names
+# and a sample list. It return the mean relative abundance of the species passed
+# for the samples passed in sample_list.
+mean_abundance <- function(df, species_name, sample_list) {
+  # Check if the species and samples exist
+  if (!(species_name %in% rownames(df))) {
+    stop("Species not found in the dataframe.")
+  }
+  missing_samples <- setdiff(sample_list, colnames(df))
+  if (length(missing_samples) > 0) {
+    stop(paste("These samples are missing in the dataframe:", paste(missing_samples, collapse = ", ")))
+  }
+  
+  # Subset the values for the species and samples
+  values <- df[species_name, sample_list]
+  
+  # Calculate and return the mean
+  return(mean(as.numeric(values)))
+}
+
+# This function takes a dataframe, a string of species names
+# and a string for clustering method and k for the number of clusters to use.
+# It returns the mean relative abundance of the species passed
+# in the different sample clusters.
+cluster_mean_abundance <- function(df, species_name, k = 2, method = "euclidean") {
+  # Check species
+  if (!(species_name %in% rownames(df))) {
+    stop("Species not found in the dataframe.")
+  }
+  
+  # Transpose for clustering samples (they are in columns)
+  dist_matrix <- dist(t(df), method = method)
+  hc <- hclust(dist_matrix)
+  
+  # Cut tree into k groups
+  groups <- cutree(hc, k = k)
+  
+  # Create a list of samples per cluster
+  cluster_samples <- split(names(groups), groups)
+  
+  # Print results
+  cat("Number of clusters:", length(cluster_samples), "\n\n")
+  
+  for (i in seq_along(cluster_samples)) {
+    samples <- cluster_samples[[i]]
+    mean_abund <- mean(as.numeric(df[species_name, samples]))
+    cat("Cluster", i, "- Mean relative abundance of", species_name, ":", round(mean_abund, 5), "\n")
+  }
+}
+
+
+cluster_mean_abundance <- function(df, species_name, k = 2, method = "euclidean", show_samples = FALSE) {
+  # Check species
+  if (!(species_name %in% rownames(df))) {
+    stop("Species not found in the dataframe.")
+  }
+  
+  # Transpose for clustering samples
+  dist_matrix <- dist(t(df), method = method)
+  hc <- hclust(dist_matrix)
+  
+  # Cut tree into k groups
+  groups <- cutree(hc, k = k)
+  
+  # Group sample names by cluster
+  cluster_samples <- split(names(groups), groups)
+  
+  # Print results
+  cat("Number of clusters:", length(cluster_samples), "\n\n")
+  
+  for (i in seq_along(cluster_samples)) {
+    samples <- cluster_samples[[i]]
+    mean_abund <- mean(as.numeric(df[species_name, samples]))
+    cat("Cluster", i, "- Mean relative abundance of", species_name, ":", round(mean_abund, 5), "\n")
+    
+    if (show_samples) {
+      cat("  Samples in cluster", i, ":\n")
+      cat("   ", paste(samples, collapse = ", "), "\n\n")
+    }
+  }
+}
+
+cluster_and_map_metadata <- function(df_abundance, df_metadata, species_name, k = NULL, method = "euclidean") {
+  # Check species exists
+  if (!(species_name %in% rownames(df_abundance))) {
+    stop("Species not found in the abundance dataframe.")
+  }
+  
+  # Distance and clustering
+  dist_matrix <- dist(t(df_abundance), method = method)
+  hc <- hclust(dist_matrix)
+  
+  # If k is NULL, find optimal k via silhouette
+  if (is.null(k)) {
+    library(cluster)
+    sil_widths <- c()
+    for (test_k in 2:(ncol(df_abundance) - 1)) {
+      clusters_test <- cutree(hc, k = test_k)
+      sil <- silhouette(clusters_test, dist_matrix)
+      sil_widths[test_k] <- mean(sil[, 3])
+    }
+    k <- which.max(sil_widths)
+    cat("Optimal number of clusters chosen via silhouette method:", k, "\n")
+  }
+  
+  # Assign clusters
+  cluster_assignments <- cutree(hc, k = k)
+  names(cluster_assignments) <- colnames(df_abundance)
+  
+  # Group SynCom IDs by cluster
+  cluster_groups <- split(names(cluster_assignments), cluster_assignments)
+  
+  # Print summary
+  cat("Number of clusters:", length(cluster_groups), "\n\n")
+  for (i in seq_along(cluster_groups)) {
+    syncoms <- cluster_groups[[i]]
+    mean_abund <- mean(as.numeric(df_abundance[species_name, syncoms]))
+    cat("Cluster", i, "- Mean relative abundance of", species_name, ":", round(mean_abund, 5), "\n")
+    cat("  SynComs in this cluster:", paste(syncoms, collapse = ", "), "\n\n")
+  }
+  #print(cluster_assignments)
+  # Add Cluster info to metadata based on SynCom column
+  df_metadata$ATTRIBUTE_Cluster <- cluster_assignments[as.character(df_metadata$ATTRIBUTE_SynCom)]
+  
+  return(df_metadata)
+}
+
+add_custom_attribute <- function(df_metadata, attribute_name, syncom_list) {
+  # New column name
+  col_name <- paste0("ATTRIBUTE_", attribute_name)
+  
+  # Fill column with TRUE/FALSE based on SynCom membership
+  df_metadata[[col_name]] <- df_metadata$ATTRIBUTE_SynCom %in% syncom_list
+  
+  return(df_metadata)
+}
+
+# Count species per sample and add to metadata by matching metadata rownames to abundance colnames
+add_species_count_by_rownames <- function(df_metadata, df_abundance, threshold = 0, fill_missing = NA) {
+  # Basic checks
+  if (is.null(rownames(df_metadata))) stop("df_metadata must have row names (sample IDs).")
+  if (is.null(colnames(df_abundance))) stop("df_abundance must have column names (sample IDs).")
+  
+  # Count species present per sample (columns) using threshold
+  species_count <- colSums(df_abundance > threshold, na.rm = TRUE)
+  
+  # Map counts to metadata via its row names
+  mapped <- species_count[rownames(df_metadata)]
+  
+  # Optionally fill missing (samples in metadata not found in abundance)
+  if (!is.na(fill_missing)) {
+    mapped[is.na(mapped)] <- fill_missing
+  }
+  
+  # Attach to metadata
+  df_metadata$Species_Count <- mapped
+  
+  # (Optional) informative messages about mismatches
+  missing_in_abund <- setdiff(rownames(df_metadata), names(species_count))
+  extra_in_abund   <- setdiff(names(species_count), rownames(df_metadata))
+  if (length(missing_in_abund) > 0) {
+    warning("Samples in metadata not found in abundance: ", paste(missing_in_abund, collapse = ", "))
+  }
+  if (length(extra_in_abund) > 0) {
+    message("Note: samples in abundance with no metadata: ", paste(extra_in_abund, collapse = ", "))
+  }
+  
+  return(df_metadata)
+}

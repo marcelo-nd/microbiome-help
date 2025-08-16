@@ -193,7 +193,7 @@ get_palette <- function(nColors = 50){
                   "#9C4A1A", "#ffe599", "#583E26", "#A78B71", "#F7C815",
                   "#EC9704", "#4B1E19", "firebrick2", "#C8D2D1", "#14471E",
                   "#6279B8", "#DA6A00", "#C0587E", "#FC8B5E", "#FEF4C0",
-                  "#EA592A", "khaki3", "lavenderblush3", "indianred4", "lightblue",
+                  "#EA592A", "khaki3", "lavenderblush3", "indianred4",
                   "honeydew1", "hotpink4", "ivory3", "#49516F", "#502F4C",
                   "#A8C686", "#669BBC", "#29335C", "#E4572E", "#F3A712",
                   "#EF5B5B", "#FFBA49", "#20A39E", "#23001E", "#A4A9AD")
