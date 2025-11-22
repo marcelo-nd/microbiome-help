@@ -22,7 +22,7 @@ library(ggpattern)
 
 source("C:/Users/marce/Documents/GitHub/microbiome-help/feature_table_wrangling.R")
 
-get_palette <- function(nColors = 60){
+get_palette <- function(nColors = 60, replace_cols = FALSE){
   colors_vec <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442","#0072B2",
                   "brown1", "#CC79A7", "olivedrab3", "rosybrown", "darkorange3",
                   "blueviolet", "darkolivegreen4", "lightskyblue4", "navajowhite4",
@@ -41,7 +41,7 @@ get_palette <- function(nColors = 60){
   
   #set.seed(1)
   
-  return(colors_vec[sample(1:length(colors_vec), size = nColors)])
+  return(colors_vec[sample(1:length(colors_vec), size = nColors, replace = replace_cols)])
 }
 
 # todo: strain level
@@ -51,7 +51,7 @@ barplot_from_feature_table <- function(feature_table, sort_type = "none", featur
                                        y_axis_title_size = 12, y_axis_text_size = 12, y_axis_text_angle = 90,
                                        legend_pos = "right", legend_title_size = 12, legend_text_size = 12, legend_cols = 3,
                                        x_vjust = 0.5, x_hjust = 1, 
-                                       colour_palette = NULL){
+                                       colour_palette = NULL, replace_c = FALSE){
   ### Step 1. Clean feature table
   # Remove empty rows (features)
   feature_table2 <- filter_features_by_col_counts(feature_table, min_count = 1, col_number = 1) # why is this not working???
@@ -149,7 +149,7 @@ barplot_from_feature_table <- function(feature_table, sort_type = "none", featur
   if (is.null(colour_palette)) { # get colour palette
     print("Colour pallette generated")
     nfeatures <- length(unique(plot_df_filtered$species))
-    colour_palette <- get_palette(nColors = nfeatures)
+    colour_palette <- get_palette(nColors = nfeatures, replace_cols = replace_c)
     print(colour_palette)
   }
   
